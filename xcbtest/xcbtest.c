@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <stdlib.h>
 
 #include <unistd.h>
@@ -98,11 +99,21 @@ int create_gcontext2(void)
 
   mask = XCB_CW_BACK_PIXEL | XCB_CW_EVENT_MASK;
   values[0] = screen->white_pixel;
-  values[1] = XCB_EVENT_MASK_EXPOSURE;
+  values[1] = XCB_EVENT_MASK_EXPOSURE | XCB_EVENT_MASK_KEY_PRESS;
 
   xcb_create_window(connection, XCB_COPY_FROM_PARENT, window, screen->root, 0,
                     0, 150, 150, 10, XCB_WINDOW_CLASS_INPUT_OUTPUT,
                     screen->root_visual, mask, values);
+
+  xcb_intern_atom_cookie_t cookie = xcb_intern_atom(connection, 1, 12,
+"WM_PROTOCOLS");
+  xcb_intern_atom_reply_t* reply = xcb_intern_atom_reply(connection, cookie, 0);
+
+  xcb_intern_atom_cookie_t cookie2 = xcb_intern_atom(connection, 0, 16,
+"WM_DELETE_WINDOW");
+  xcb_intern_atom_reply_t* reply2 = xcb_intern_atom_reply(connection, cookie2, 0);
+
+  xcb_change_property(connection, XCB_PROP_MODE_REPLACE, window, reply->atom, 4, 32, 1, &reply2->atom);
 
   xcb_map_window(connection, window);
   xcb_flush(connection);
@@ -120,9 +131,21 @@ int create_gcontext2(void)
       xcb_poly_arc(connection, window, foreground, 2, arcs);
       xcb_flush(connection);
 
+      puts("expose");
+
+      break;
+
+    case XCB_CLIENT_MESSAGE:
+      puts("client message");
+      return 0;
+      break;
+
+    case XCB_KEY_PRESS:
+      puts("key pressed");
       break;
 
     default:
+      puts("default");
       break;
     }
 
