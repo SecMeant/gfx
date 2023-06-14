@@ -217,7 +217,7 @@ int main(int argc, char **argv)
                         if (pixels_cur >= pixels_end)
                                 pixels_cur = pixels_begin;
 
-                        *(uint32_t*)&dev.map[dev.stride * y + x * 4] = pixel;
+                        *(volatile uint32_t*)&dev.map[dev.stride * y + x * 4] = pixel;
                 }
         }
 
