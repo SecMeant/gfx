@@ -78,22 +78,61 @@ create_instance(const char *app_name)
   return instance;
 }
 
-[[nodiscard]] static std::vector<VkPhysicalDevice>
+struct device_info
+{
+  VkPhysicalDevice device;
+  std::vector<VkQueueFamilyProperties> queue_properties;
+  VkPhysicalDeviceMemoryProperties memory_properties;
+  VkPhysicalDeviceProperties device_properties;
+};
+
+[[nodiscard]] static std::vector<device_info>
 enumerate_devices(VkInstance instance)
 {
   VkResult res;
   uint32_t dev_count;
   std::vector<VkPhysicalDevice> devs;
+  std::vector<device_info> ret;
 
   vkEnumeratePhysicalDevices(instance, &dev_count, nullptr);
   if (dev_count == 0)
-    return devs;
+    return ret;
 
   devs.resize(dev_count);
 
   res = vkEnumeratePhysicalDevices(instance, &dev_count, devs.data());
+  if (res != VK_SUCCESS) {
+    printf("Failed to enumerate physical devices\n");
+    return ret;
+  }
 
-  return devs;
+  for (const auto &dev: devs) {
+    uint32_t queue_properties_count;
+    std::vector<VkQueueFamilyProperties> queue_properties;
+    VkPhysicalDeviceMemoryProperties memory_properties;
+    VkPhysicalDeviceProperties device_properties;
+
+    vkGetPhysicalDeviceQueueFamilyProperties(dev, &queue_properties_count, nullptr);
+    if (queue_properties_count == 0) {
+      printf("WARNING: got number of queue family properties == 0 for device %p\n", dev);
+      continue;
+    }
+
+    queue_properties.resize(queue_properties_count);
+    vkGetPhysicalDeviceQueueFamilyProperties(dev, &queue_properties_count, queue_properties.data());
+
+    vkGetPhysicalDeviceMemoryProperties(dev, &memory_properties);
+    vkGetPhysicalDeviceProperties(dev, &device_properties);
+
+    ret.emplace_back(device_info {
+      .device = dev,
+      .queue_properties = std::move(queue_properties),
+      .memory_properties = memory_properties,
+      .device_properties = device_properties,
+    });
+  }
+
+  return ret;
 }
 
 int main(void)
@@ -109,6 +148,14 @@ int main(void)
 #endif
 
   const auto instance = create_instance("vkexplore").value();
+
+  const auto devices = enumerate_devices(instance);
+  if (devices.size() == 0) {
+    printf("No devices found");
+    return 1;
+  }
+
+  printf("Found %zu devices\n", devices.size());
 
   return 0;
 }
