@@ -1,10 +1,15 @@
 OPT_PRINT_VULKAN_LAYERS:=1
+OPT_PRINT_VULKAN_EXTENSIONS:=1
 
-CXX_FLAGS:=-std=c++23 -Wall -Wextra -I/home/holz/etc/git/vulkan_headers/build/install/include/
-LINK_FLAGS:=-lvulkan
+CXX_FLAGS:=-O0 -g3 -ggdb -std=c++23 -Wall -Wextra -I/home/holz/etc/git/vulkan_headers/build/install/include/
+LINK_FLAGS:=-lvulkan -lxcb
 
 ifeq ($(OPT_PRINT_VULKAN_LAYERS),1)
 	CXX_FLAGS+= -DOPT_PRINT_VULKAN_LAYERS
+endif
+
+ifeq ($(OPT_PRINT_VULKAN_EXTENSIONS),1)
+	CXX_FLAGS+= -DOPT_PRINT_VULKAN_EXTENSIONS
 endif
 
 all: vkexplore
@@ -16,7 +21,7 @@ vkexplore: vkexplore.o
 	$(CXX) $^ -o $@ $(LINK_FLAGS)
 
 clean:
-	rm -f vkexplore.o
+	rm -f vkexplore.o vkexplore
 
 .PHONY: clean
 
