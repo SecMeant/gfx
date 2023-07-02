@@ -91,8 +91,7 @@ create_instance(const char *app_name, const layer_properties &layers, const inst
   };
 
   std::vector<const char*> layer_names;
-  for (const auto &p : layers)
-    layer_names.emplace_back(p.layerName);
+  layer_names.emplace_back("VK_LAYER_KHRONOS_validation");
 
   std::vector<const char *> extension_names;
   for (const auto &e : extensions)
