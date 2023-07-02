@@ -5,19 +5,19 @@ CFLAGS:=-Wall -Wextra -O2 -DCL_TARGET_OPENCL_VERSION=$(OPENCL_VERSION)
 CCLFLAGS:=-O3
 LDFLAGS:=-lOpenCL
 
-all: bruteforce bruteforce.bc
+all: square square.bc
 
 %.o: %.c Makefile
 	$(CC) $< -c -o $@ $(CFLAGS)
 
-bruteforce: bruteforce.o Makefile
+square: square.o Makefile
 	$(CC) $< -o $@ $(LDFLAGS)
 
-bruteforce.bc: bruteforce.cl Makefile
+square.bc: square.cl Makefile
 	$(CCL) -c -target spir64 -emit-llvm -o $@ $< $(CCLFLAGS)
 
 clean:
-	rm -f bruteforce bruteforce.o bruteforce.bc
+	rm -f square square.o square.bc
 
 .PHONY: clean
 

@@ -7,8 +7,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 
-// FIXME: don't hardcode the path...
-#define SPIRV_FILEPATH "/home/holz/opencl_oldschool/bruteforce.bc"
+#define SPIRV_FILEPATH "./square2.bc"
 
 int load_spirv(const char *path, void **spirv_, size_t *spirv_size_)
 {
