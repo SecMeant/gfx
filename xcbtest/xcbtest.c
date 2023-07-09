@@ -105,15 +105,32 @@ int create_gcontext2(void)
                     0, 150, 150, 10, XCB_WINDOW_CLASS_INPUT_OUTPUT,
                     screen->root_visual, mask, values);
 
-  xcb_intern_atom_cookie_t cookie = xcb_intern_atom(connection, 1, 12,
-"WM_PROTOCOLS");
-  xcb_intern_atom_reply_t* reply = xcb_intern_atom_reply(connection, cookie, 0);
+  // Enable close window event
+  xcb_intern_atom_cookie_t cookie;
+  xcb_intern_atom_reply_t* reply;
 
-  xcb_intern_atom_cookie_t cookie2 = xcb_intern_atom(connection, 0, 16,
-"WM_DELETE_WINDOW");
-  xcb_intern_atom_reply_t* reply2 = xcb_intern_atom_reply(connection, cookie2, 0);
+  cookie = xcb_intern_atom(connection, 1, 12, "WM_PROTOCOLS");
+  reply = xcb_intern_atom_reply(connection, cookie, 0);
+
+  cookie2 = xcb_intern_atom(connection, 0, 16, "WM_DELETE_WINDOW");
+  reply2 = xcb_intern_atom_reply(connection, cookie2, 0);
 
   xcb_change_property(connection, XCB_PROP_MODE_REPLACE, window, reply->atom, 4, 32, 1, &reply2->atom);
+
+  free(reply);
+  free(reply2);
+
+  // Set window type to splash/floating
+  cookie = xcb_intern_atom(connection, 1, 19, "_NET_WM_WINDOW_TYPE");
+  reply = xcb_intern_atom_reply(connection, cookie, 0);
+
+  cookie2 = xcb_intern_atom(connection, 0, 26, "_NET_WM_WINDOW_TYPE_SPLASH");
+  reply2 = xcb_intern_atom_reply(connection, cookie2, 0);
+
+  xcb_change_property(connection, XCB_PROP_MODE_REPLACE, window, reply->atom, 4, 32, 1, &reply2->atom);
+
+  free(reply);
+  free(reply2);
 
   xcb_map_window(connection, window);
   xcb_flush(connection);
