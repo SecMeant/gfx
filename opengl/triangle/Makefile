@@ -3,7 +3,7 @@ CXX ?= g++
 CFLAGS_BASE := -Wall -Wextra -O2 -std=c++23
 CXX_LINK_FLAGS := -lGL -lglfw -lGLEW -lmipc
 
-CFLAGS += $(CFLAGS_BASE)
+CFLAGS := $(CFLAGS_BASE) $(CFLAGS)
 
 all: triangle Makefile
 

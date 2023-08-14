@@ -9,7 +9,14 @@
 #include <GL/gl.h>
 #include <GL/glext.h>
 
+#include <glm/glm.hpp>
+#include <glm/mat4x4.hpp>
+#include <glm/gtc/type_ptr.hpp>
+
 #include <mipc/file.h>
+
+const int win_width = 512;
+const int win_height = 512;
 
 static std::expected<GLuint, int>
 load_shader(const char *path, GLuint kind)
@@ -79,16 +86,40 @@ load_shaders(const char *vertex_shader_path, const char *fragment_shader_path)
     return program_id;
 }
 
+static glm::vec3 position = { 0.0f, 0.0f, 0.0f };
+static glm::mat4x4 projection_mat;
+
+struct
+{
+    glm::vec3 eye;
+    glm::vec3 center;
+    glm::vec3 up;
+} static camera;
+
 const GLfloat vpoint[] = {
-    -1.0f, -1.0f, 0.0f,
-     1.0f, -1.0f, 0.0f,
-     0.0f,  1.0f, 0.0f,
+    -0.5f,  0.5f, 0.0f,
+     0.5f,  0.5f, 0.0f,
+     0.5f, -0.5f, 0.0f,
+
+    -0.5f,  0.5f, 0.0f,
+     0.5f, -0.5f, 0.0f,
+    -0.5f, -0.5f, 0.0f,
 };
 
-static void
+static GLuint
 init()
 {
     glClearColor(0.0, 0.0, 0.0, 1.0);
+
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LESS);
+
+    glViewport(0, 0, win_width, win_height);
+    projection_mat = glm::perspective(3.141592653589793f/2.0f, (float)win_width / (float)win_height, 0.1f, 10.0f);
+
+    camera.eye = { 0.0f, 0.0f, -1.0f };
+    camera.center = { 0.0f, 0.0f, 0.0f };
+    camera.up = { 0.0f, 1.0f, 0.0f };
 
     GLuint shader_program = load_shaders("vshader.glsl", "fshader.glsl").value();
 
@@ -107,13 +138,67 @@ init()
     glEnableVertexAttribArray(vpoint_id);
     glBindBuffer(GL_ARRAY_BUFFER, vbo_id);
     glVertexAttribPointer(vpoint_id, 3, GL_FLOAT, GL_FALSE, 0, NULL);
+
+    return shader_program;
 }
 
 static void
-render()
+render(GLuint shader_program, glm::mat4x4 model, glm::mat4x4 view, glm::mat4x4 projection)
 {
-    glClear(GL_COLOR_BUFFER_BIT);
-    glDrawArrays(GL_TRIANGLES, 0, 3);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    glUniformMatrix4fv(glGetUniformLocation(shader_program, "model"), 1, GL_FALSE, glm::value_ptr(model));
+    glUniformMatrix4fv(glGetUniformLocation(shader_program, "view"), 1, GL_FALSE, glm::value_ptr(view));
+    glUniformMatrix4fv(glGetUniformLocation(shader_program, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
+
+#if defined(DRAW_OUTLINE)
+    glDrawArrays(GL_LINE_LOOP, 0, 6);
+#else
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+#endif
+}
+
+// Returns if should exit the render loop
+static int
+handle_key(GLFWwindow *window)
+{
+    if (glfwWindowShouldClose(window))
+        return 1;
+
+    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
+        return 1;
+
+    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
+        camera.eye.z += 0.125f;
+        camera.center.z += 0.125f;
+    }
+
+    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {
+        camera.eye.z -= 0.125f;
+        camera.center.z -= 0.125f;
+    }
+
+    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) {
+        camera.eye.x += 0.125f;
+        camera.center.x += 0.125f;
+    }
+
+    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
+        camera.eye.x -= 0.125f;
+        camera.center.x -= 0.125f;
+    }
+
+    if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) {
+        camera.eye.y += 0.125f;
+        camera.center.y += 0.125f;
+    }
+
+    if (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS) {
+        camera.eye.y -= 0.125f;
+        camera.center.y -= 0.125f;
+    }
+
+    return 0;
 }
 
 int
@@ -128,7 +213,7 @@ main()
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-    GLFWwindow *window = glfwCreateWindow(512, 512, "triangle", NULL, NULL);
+    GLFWwindow *window = glfwCreateWindow(win_width, win_height, "triangle", NULL, NULL);
 
     if (!window) {
         fprintf(stderr, "window\n");
@@ -143,10 +228,15 @@ main()
         return 1;
     }
 
-    init();
+    GLuint shader_program = init();
 
-    while (glfwGetKey(window, GLFW_KEY_ESCAPE) != GLFW_PRESS && !glfwWindowShouldClose(window)) {
-        render();
+    glm::mat4 object_mat_rot = glm::mat4(1.0);
+
+    while (1) {
+        if (handle_key(window))
+            break;
+
+        render(shader_program, object_mat_rot, glm::lookAt(camera.eye, camera.center, camera.up), projection_mat);
         glfwSwapBuffers(window);
         glfwSwapInterval(1);
         glfwPollEvents();
