@@ -158,11 +158,21 @@ render(GLuint shader_program, glm::mat4x4 model, glm::mat4x4 view, glm::mat4x4 p
 #endif
 }
 
+static bool m_visible;
+
+static void cursor_position_callback(GLFWwindow *window, double xpos, double ypos)
+{
+    printf("Mouse at %lf %lf\n", xpos, ypos);
+
+    if (!m_visible)
+        glfwSetCursorPos(window, 0, 0);
+}
+
 // Returns if should exit the render loop
 static int
 handle_key(GLFWwindow *window)
 {
-    if (glfwWindowShouldClose(window))
+    if (glfwWindowShouldClose(window) || (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS))
         return 1;
 
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
@@ -198,6 +208,15 @@ handle_key(GLFWwindow *window)
         camera.center.y -= 0.125f;
     }
 
+    if (glfwGetKey(window, GLFW_KEY_G) == GLFW_PRESS) {
+        if (m_visible)
+            glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+        else
+            glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+
+        m_visible = !m_visible;
+    }
+
     return 0;
 }
 
@@ -219,6 +238,9 @@ main()
         fprintf(stderr, "window\n");
         return 1;
     }
+
+    glfwSetCursorPosCallback(window, &cursor_position_callback);
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
     glfwMakeContextCurrent(window);
 
