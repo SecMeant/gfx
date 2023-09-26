@@ -7,9 +7,17 @@
 #include <unistd.h>
 #include <fcntl.h>
 
-#define SPIRV_FILEPATH "./square2.bc"
+#ifndef COMPILE_ONLINE
+#define COMPILE_ONLINE 1
+#endif
 
-int load_spirv(const char *path, void **spirv_, size_t *spirv_size_)
+#if COMPILE_ONLINE
+#define SPIRV_FILEPATH "./square.cl"
+#else
+#define SPIRV_FILEPATH "./square.spv"
+#endif
+
+static int load_spirv(const char *path, void **spirv_, size_t *spirv_size_)
 {
 	struct stat spirv_stat;
 	void *spirv = NULL;
@@ -77,13 +85,13 @@ int main(void)
 
 	err = clGetPlatformIDs(1, &platform, NULL);
 	if (err < 0) {
-		perror("clGetPlatformIDs");
+		fprintf(stderr, "clGetPlatformIDs: %d\n", err);
 		return 1;
 	}
 
 	err = clGetDeviceIDs(platform, CL_DEVICE_TYPE_GPU, 1, &device, NULL);
 	if (err < 0) {
-		perror("clGetDeviceIDs");
+		fprintf(stderr, "clGetDeviceIDs: %d\n", err);
 		return 1;
 	}
 
@@ -94,15 +102,25 @@ int main(void)
 
 	context = clCreateContext(NULL, 1, &device, NULL , NULL, &err);
 	if (err < 0) {
-		perror("clCreateContext");
+		fprintf(stderr, "clCreateContext: %d\n", err);
 		return 1;
 	}
 
-	program = clCreateProgramWithIL(context, spirv, spirv_size, &err);
+#if COMPILE_ONLINE
+	const char*  sources[1]     = { spirv };
+	const size_t source_lens[1] = { spirv_size };
+	program = clCreateProgramWithSource(context, 1, sources, source_lens, &err);
 	if (err < 0) {
-		perror("clCreateProgramWithIL");
+		fprintf(stderr, "clCreateProgramWithIL: %d\n", err);
 		return 1;
 	}
+#else
+	program = clCreateProgramWithIL(context, spirv, spirv_size, &err);
+	if (err < 0) {
+		fprintf(stderr, "clCreateProgramWithIL: %d\n", err);
+		return 1;
+	}
+#endif
 
 	err = clBuildProgram(program, 0, NULL, NULL, NULL, NULL);
 	if (err < 0) {
@@ -112,13 +130,13 @@ int main(void)
 
 	queue = clCreateCommandQueueWithProperties(context, device, NULL, &err);
 	if (err < 0) {
-		perror("clCreateCommandQueueWithProperties\n");
+		fprintf(stderr, "clCreateCommandQueueWithProperties\n: %d\n", err);
 		return 1;
 	}
 
 	kernel = clCreateKernel(program, "square", &err);
 	if (err < 0) {
-		perror("clCreateKernel\n");
+		fprintf(stderr, "clCreateKernel\n: %d\n", err);
 		return 1;
 	}
 
@@ -133,7 +151,7 @@ int main(void)
 
 	err = clEnqueueWriteBuffer(queue, input_buffer, CL_TRUE, 0, sizeof(input), input, 0, NULL, NULL);
 	if (err < 0) {
-		perror("clEnqueueWriteBuffer");
+		fprintf(stderr, "clEnqueueWriteBuffer: %d\n", err);
 		return 1;
 	}
 
@@ -147,14 +165,18 @@ int main(void)
 
 	err = clGetKernelWorkGroupInfo(kernel, device, CL_KERNEL_WORK_GROUP_SIZE, sizeof(local_size), &local_size, NULL);
 	if (err < 0) {
-		perror("clGetKernelWorkGroupInfo");
+		fprintf(stderr, "clGetKernelWorkGroupInfo: %d\n", err);
 		return 1;
 	}
 
+	// Some loaders don't like when local_size exceeds the global_size.
 	global_size = count;
+	if (local_size > global_size)
+		local_size = global_size;
+
 	err = clEnqueueNDRangeKernel(queue, kernel, 1, NULL, &global_size, &local_size, 0, NULL, NULL);
 	if (err < 0) {
-		perror("clEnqueueNDRangeKernel");
+		fprintf(stderr, "clEnqueueNDRangeKernel: %d\n", err);
 		return 1;
 	}
 
@@ -162,7 +184,7 @@ int main(void)
 
 	err = clEnqueueReadBuffer(queue, output_buffer, CL_TRUE, 0, sizeof(output), output, 0, NULL, NULL);
 	if (err < 0) {
-		perror("clEnqueueReadBuffer");
+		fprintf(stderr, "clEnqueueReadBuffer: %d\n", err);
 		return 1;
 	}
 
