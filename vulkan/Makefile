@@ -4,6 +4,9 @@ OPT_PRINT_VULKAN_EXTENSIONS:=1
 CXX_FLAGS:=-O0 -g3 -ggdb -std=c++23 -Wall -Wextra -I/home/holz/etc/git/vulkan_headers/build/install/include/
 LINK_FLAGS:=-lvulkan -lxcb
 
+GLSLC:=/bin/glslc
+GLSLC_FLAGS:=-O
+
 ifeq ($(OPT_PRINT_VULKAN_LAYERS),1)
 	CXX_FLAGS+= -DOPT_PRINT_VULKAN_LAYERS
 endif
@@ -12,10 +15,13 @@ ifeq ($(OPT_PRINT_VULKAN_EXTENSIONS),1)
 	CXX_FLAGS+= -DOPT_PRINT_VULKAN_EXTENSIONS
 endif
 
-all: vkexplore
+all: vkexplore square.spv
 
 %.o: %.cc Makefile
 	$(CXX) $< -c -o $@ $(CXX_FLAGS)
+
+square.spv: square.comp Makefile
+	$(GLSLC) $< -o $@ $(GLSLC_FLAGS)
 
 vkexplore: vkexplore.o
 	$(CXX) $^ -o $@ $(LINK_FLAGS)

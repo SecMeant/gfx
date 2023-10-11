@@ -3,10 +3,13 @@
 #include <cstdlib>
 #include <expected>
 #include <limits>
+#include <optional>
 #include <vector>
 #include <cassert>
 
 #include <unistd.h>
+#include <fcntl.h>
+#include <sys/stat.h>
 
 #include <vulkan/vulkan.h>
 
@@ -218,6 +221,8 @@ struct memory_info
 {
   VkBuffer input_buffer;
   VkBuffer output_buffer;
+  VkDeviceMemory input_memory;
+  VkDeviceMemory output_memory;
 };
 
 static constexpr VkDeviceSize INPUT_BUFFER_SIZE_BYTES = 1024;
@@ -261,7 +266,7 @@ allocate_memory(const device_info device_info)
     .pQueueFamilyIndices = &device_info.queue_family_index,
   };
 
-  res = vkCreateBuffer(device_info.device, &output_buffer_create_info, nullptr, &ret.input_buffer);
+  res = vkCreateBuffer(device_info.device, &output_buffer_create_info, nullptr, &ret.output_buffer);
   if (res != VK_SUCCESS) {
     printf("Failed to create output buffer: %d\n", res);
     return std::unexpected(VkResult(-1));
@@ -269,13 +274,263 @@ allocate_memory(const device_info device_info)
 
 
   /*
-   * Query memory types and search for memory that is host and device visible.
+   * Query memory types and search for memory that is device local.
    */
 
   VkPhysicalDeviceMemoryProperties memory_properties;
   vkGetPhysicalDeviceMemoryProperties(device_info.physical_device, &memory_properties);
 
+  const auto opt_device_mem_index = [&] () -> std::optional<uint32_t> {
+
+    for (auto i = 0u; i < memory_properties.memoryTypeCount; ++i) {
+      const auto mtype = memory_properties.memoryTypes[i];
+
+      if (mtype.propertyFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)
+        return i;
+
+    }
+
+    return std::nullopt;
+
+  }();
+
+  if (!opt_device_mem_index.has_value()) {
+    printf("Failed to find device local memory\n");
+    return std::unexpected(VkResult(-1));
+  }
+
+  const VkMemoryAllocateInfo memory_allocation_input_info = {
+    .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+    .pNext = nullptr,
+    .allocationSize = INPUT_BUFFER_SIZE_BYTES,
+    .memoryTypeIndex = opt_device_mem_index.value(),
+  };
+
+  res = vkAllocateMemory(device_info.device, &memory_allocation_input_info, nullptr, &ret.input_memory);
+  if (res != VK_SUCCESS) {
+    printf("Failed to allocate memory for input: %d\n", res);
+    return std::unexpected(VkResult(-1));
+  }
+
+  const VkMemoryAllocateInfo memory_allocation_output_info = {
+    .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+    .pNext = nullptr,
+    .allocationSize = OUTPUT_BUFFER_SIZE_BYTES,
+    .memoryTypeIndex = opt_device_mem_index.value(),
+  };
+
+  res = vkAllocateMemory(device_info.device, &memory_allocation_output_info, nullptr, &ret.output_memory);
+  if (res != VK_SUCCESS) {
+    printf("Failed to allocate memory for output: %d\n", res);
+    return std::unexpected(VkResult(-1));
+  }
+
+  res = vkBindBufferMemory(device_info.device, ret.input_buffer, ret.input_memory, 0);
+  if (res != VK_SUCCESS) {
+    printf("Failed to bind input memory to a buffer: %d\n", res);
+    return std::unexpected(VkResult(-1));
+  }
+
+  res = vkBindBufferMemory(device_info.device, ret.output_buffer, ret.output_memory, 0);
+  if (res != VK_SUCCESS) {
+    printf("Failed to bind output memory to a buffer: %d\n", res);
+    return std::unexpected(VkResult(-1));
+  }
+
   return ret;
+}
+
+struct shader_data
+{
+  uint8_t *data;
+  uint32_t size;
+};
+
+static std::optional<shader_data> read_shader_(const char * const filepath)
+{
+  int shader_fd = -1;
+  struct stat statbuf = {};
+  struct shader_data ret = {};
+
+  shader_fd = open(filepath, 0, O_RDONLY);
+
+  if (shader_fd == -1) {
+    perror("shader");
+    return std::nullopt;
+  }
+
+  struct defer_fd_close_t {
+    defer_fd_close_t(int fd)
+      : fd(fd) {}
+
+    ~defer_fd_close_t()
+    { close(this->fd); }
+
+    int fd;
+
+  } const defer_fd_close(shader_fd);
+
+  if (fstat(shader_fd, &statbuf)) {
+    perror("fstat");
+    return std::nullopt;
+  }
+
+  /*
+   * We allocate with operator new, so we can just leak it and let the kernel
+   * do the cleaning.
+   */
+  ret.data = new uint8_t[statbuf.st_size];
+  ret.size = statbuf.st_size;
+
+  if (!ret.data) {
+    printf("Failed to allocate memory for shader\n");
+    return std::nullopt;
+  }
+
+  /*
+   * FIXME: We probably want to read in loop until we read entire file, instead
+   *        of assuming that a single read would suffice.
+   */
+  if (read(shader_fd, ret.data, ret.size) != ret.size) {
+    printf("Failed to read shader data\n");
+    return std::nullopt;
+  }
+
+  return ret;
+}
+
+struct shader_info
+{
+  VkShaderModule module;
+  struct shader_data data;
+};
+
+static std::expected<shader_info, VkResult> load_shaders(const device_info device_info)
+{
+  VkResult res;
+  VkShaderModule shader_module;
+
+  auto shader_data = read_shader_("square.spv").value();
+
+  const VkShaderModuleCreateInfo shader_module_create_info = {
+    .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+    .pNext = nullptr,
+    .flags = 0,
+    .codeSize = shader_data.size,
+    .pCode = reinterpret_cast<const uint32_t*>(shader_data.data),
+  };
+
+  res = vkCreateShaderModule(device_info.device, &shader_module_create_info, nullptr, &shader_module);
+  if (res != VK_SUCCESS) {
+    printf("Failed to create shader module: %d\n", res);
+    return std::unexpected(res);
+  }
+
+  return shader_info { .module = shader_module, .data = shader_data };
+}
+
+struct pipeline_info
+{
+  VkDescriptorSetLayout descriptor_set_layout;
+  VkPipelineLayout layout;
+  VkPipeline pipeline;
+};
+
+static std::expected<pipeline_info, VkResult>
+configure_pipeline(const device_info device_info, const shader_info shader_info)
+{
+  VkResult res;
+  VkDescriptorSetLayout descriptor_set_layout;
+  VkPipelineLayout pipeline_layout;
+  VkPipeline pipeline;
+
+  const VkDescriptorSetLayoutBinding descriptor_set_layout_bindings[2] = {
+    [0] = {
+      .binding = 0,
+      .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+      .descriptorCount = 1,
+      .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
+      .pImmutableSamplers = nullptr,
+    },
+
+    [1] = {
+      .binding = 1,
+      .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+      .descriptorCount = 1,
+      .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
+      .pImmutableSamplers = nullptr,
+    },
+  };
+
+  const VkDescriptorSetLayoutCreateInfo descriptor_set_layout_create_info = {
+    .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+    .pNext = nullptr,
+    .flags = 0, // FIXME: should the flags be 0? Not sure.
+    .bindingCount = 2,
+    .pBindings = descriptor_set_layout_bindings,
+  };
+
+  res = vkCreateDescriptorSetLayout(device_info.device,
+      &descriptor_set_layout_create_info, nullptr, &descriptor_set_layout);
+  if (res != VK_SUCCESS) {
+    printf("Failed to create descriptor set layout: %d\n", res);
+    return std::unexpected(res);
+  }
+
+  const VkPipelineLayoutCreateInfo pipeline_layout_create_info = {
+    .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+    .pNext = nullptr,
+    .flags = 0,
+    .setLayoutCount = 1,
+    .pSetLayouts = &descriptor_set_layout,
+
+    /*
+     * TODO: Experiment with push constants. For example add bias that is added
+     *       after squaring to each element.
+     */
+    .pushConstantRangeCount = 0,
+    .pPushConstantRanges = nullptr,
+  };
+
+  res = vkCreatePipelineLayout(device_info.device,
+      &pipeline_layout_create_info, nullptr, &pipeline_layout);
+  if (res != VK_SUCCESS) {
+    printf("Failed to create pipeline layout: %d\n", res);
+    return std::unexpected(res);
+  }
+
+  const VkPipelineShaderStageCreateInfo pipeline_shader_stage_create_info = {
+    .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+    .pNext = nullptr,
+    .flags = 0,
+    .stage = VK_SHADER_STAGE_COMPUTE_BIT,
+    .module = shader_info.module,
+    .pName = "main",
+    .pSpecializationInfo = nullptr, // FIXME: Should it be nullptr?
+  };
+
+  const VkComputePipelineCreateInfo compute_pipeline_create_info = {
+    .sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
+    .pNext = nullptr,
+    .flags = 0,
+    .stage = pipeline_shader_stage_create_info,
+    .layout = pipeline_layout,
+    .basePipelineHandle = VK_NULL_HANDLE,
+    .basePipelineIndex = 0,
+  };
+
+  res = vkCreateComputePipelines(device_info.device, VK_NULL_HANDLE,
+      1, &compute_pipeline_create_info, nullptr, &pipeline);
+  if (res != VK_SUCCESS) {
+    printf("Failed to create pipeline: %d\n", res);
+    return std::unexpected(res);
+  }
+
+  return pipeline_info {
+    .descriptor_set_layout = descriptor_set_layout,
+    .layout = pipeline_layout,
+    .pipeline = pipeline,
+  };
 }
 
 int main(void)
@@ -303,6 +558,8 @@ int main(void)
   const auto instance = create_instance("vkexplore", props, extensions).value();
   const auto device_info = make_device(instance).value();
   const auto memory_info = allocate_memory(device_info).value();
+  const auto shader_info = load_shaders(device_info).value();
+  const auto pipeline_info = configure_pipeline(device_info, shader_info).value();
 
   return 0;
 }

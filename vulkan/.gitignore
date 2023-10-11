@@ -1,2 +1,5 @@
 *.o
+.cache/
+compile_commands.json
 vkexplore
+square.spv
