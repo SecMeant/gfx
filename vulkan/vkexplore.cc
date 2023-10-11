@@ -533,6 +533,104 @@ configure_pipeline(const device_info device_info, const shader_info shader_info)
   };
 }
 
+struct descriptor_info
+{
+  VkDescriptorPool descriptor_pool;
+  VkDescriptorSet descriptor_set;
+};
+
+static std::expected<descriptor_info, VkResult>
+create_descriptors(const device_info device_info, const pipeline_info pipeline_info, const memory_info memory_info)
+{
+  VkResult res;
+  VkDescriptorPool descriptor_pool;
+  VkDescriptorSet descriptor_set;
+
+  const VkDescriptorPoolSize descriptor_pool_sizes[1] = {
+    [0] = {
+      .type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+      .descriptorCount = 2,
+    },
+  };
+
+  const VkDescriptorPoolCreateInfo descriptor_pool_create_info = {
+    .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+    .pNext = nullptr,
+    .flags = 0,
+    .maxSets = 2,
+    .poolSizeCount = 1,
+    .pPoolSizes = descriptor_pool_sizes,
+  };
+
+  res = vkCreateDescriptorPool(device_info.device, &descriptor_pool_create_info,
+      nullptr, &descriptor_pool);
+  if (res != VK_SUCCESS) {
+    printf("Failed to allocate descriptor pool: %d\n", res);
+    return std::unexpected(res);
+  }
+
+  const VkDescriptorSetAllocateInfo descriptor_set_allocate_info = {
+    .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+    .pNext = nullptr,
+    .descriptorPool = descriptor_pool,
+    .descriptorSetCount = 1,
+    .pSetLayouts = &pipeline_info.descriptor_set_layout,
+  };
+
+  res = vkAllocateDescriptorSets(device_info.device, &descriptor_set_allocate_info, &descriptor_set);
+  if (res != VK_SUCCESS) {
+    printf("Failed to allocate descriptor sets: %d\n", res);
+    return std::unexpected(res);
+  }
+
+  const VkDescriptorBufferInfo input_buffer_info = {
+    .buffer = memory_info.input_buffer,
+    .offset = 0,
+    .range = INPUT_BUFFER_SIZE_BYTES,
+  };
+
+  const VkDescriptorBufferInfo output_buffer_info = {
+    .buffer = memory_info.output_buffer,
+    .offset = 0,
+    .range = OUTPUT_BUFFER_SIZE_BYTES,
+  };
+
+  const VkWriteDescriptorSet write_descriptor_sets[2] = {
+    [0] = {
+      .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+      .pNext = nullptr,
+      .dstSet = descriptor_set,
+      .dstBinding = 0,
+      .dstArrayElement = 0, // FIXME: is 0 ok here?
+      .descriptorCount = 1,
+      .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+      .pImageInfo = nullptr,
+      .pBufferInfo = &input_buffer_info,
+      .pTexelBufferView = nullptr,
+    },
+
+    [1] = {
+      .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+      .pNext = nullptr,
+      .dstSet = descriptor_set,
+      .dstBinding = 1,
+      .dstArrayElement = 0, // FIXME: is 0 ok here?
+      .descriptorCount = 1,
+      .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+      .pImageInfo = nullptr,
+      .pBufferInfo = &output_buffer_info,
+      .pTexelBufferView = nullptr,
+    },
+  };
+
+  vkUpdateDescriptorSets(device_info.device, 2, write_descriptor_sets, 0, nullptr);
+
+  return descriptor_info {
+    .descriptor_pool = descriptor_pool,
+    .descriptor_set = descriptor_set,
+  };
+}
+
 int main(void)
 {
   const auto props = get_layer_properties();
@@ -560,6 +658,7 @@ int main(void)
   const auto memory_info = allocate_memory(device_info).value();
   const auto shader_info = load_shaders(device_info).value();
   const auto pipeline_info = configure_pipeline(device_info, shader_info).value();
+  const auto descriptor_info = create_descriptors(device_info, pipeline_info, memory_info).value();
 
   return 0;
 }
