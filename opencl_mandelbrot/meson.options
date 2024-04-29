@@ -1,0 +1,4 @@
+option('CONFIG_CL_COMPILE_ONLINE', type: 'boolean', value: true)
+option('CONFIG_RENDER_TO_FILE', type: 'boolean', value: false)
+option('CONFIG_RENDER_OUTPUT_FILE_NAME', type: 'string', value: 'mandelbrot.jpg')
+
