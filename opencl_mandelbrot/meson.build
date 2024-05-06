@@ -71,4 +71,13 @@ executable(
     ]
 )
 
+custom_target(
+  'CL source link',
+  input: 'mandelbrot.cl',
+  output: 'mandelbrot.cl',
+  command: ['ln', '-sf', '@INPUT@', '@OUTPUT@'],
+  install: false,
+  build_by_default: true
+)
+
 summary(summary_info)
