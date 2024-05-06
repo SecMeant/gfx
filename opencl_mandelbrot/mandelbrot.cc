@@ -209,7 +209,9 @@ main()
     /*
      * Render the image in memory
      */
-    bitmap_render_cl(IMAGE_WIDTH, IMAGE_HEIGHT, std::data(bitmap_data));
+    const int render_result = bitmap_render_cl(IMAGE_WIDTH, IMAGE_HEIGHT, std::data(bitmap_data));
+    if (render_result)
+        return render_result;
 
     /*
      * Draw the rendered bitmap on screen or save to the file
