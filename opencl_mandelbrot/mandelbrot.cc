@@ -64,13 +64,6 @@ load_spirv(const char* const path, char** spirv_, size_t* spirv_size_)
     return 0;
 }
 
-static void
-describe_build_error()
-{
-    // TODO ;]
-    fprintf(stderr, "shit happened\n");
-}
-
 static int
 bitmap_render_cl(const u32 bitmap_width, const u32 bitmap_height, u8* const bitmap)
 {
@@ -135,7 +128,7 @@ bitmap_render_cl(const u32 bitmap_width, const u32 bitmap_height, u8* const bitm
 
     err = clBuildProgram(program, 0, NULL, NULL, NULL, NULL);
     if (err < 0) {
-        describe_build_error();
+        fprintf(stderr, "clBuildProgram: %d\n", err);
         return 1;
     }
 
