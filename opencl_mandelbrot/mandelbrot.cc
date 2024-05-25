@@ -1,215 +1,123 @@
 #include <stdio.h>
+#include <string.h>
 #include <vector>
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-enum-enum-conversion"
 
 #include <opencv2/opencv.hpp>
 
-#include <CL/cl.h>
+#pragma GCC diagnostic pop
 
-#include <sys/stat.h>
-#include <sys/mman.h>
-#include <unistd.h>
-#include <fcntl.h>
-
+#include "timing.h"
 #include "types.h"
 #include "config.h"
-
-/* FIXME: Don't assume from where we are running. */
-#if CONFIG_CL_COMPILE_ONLINE
-static const char SPIRV_FILEPATH[] = "./mandelbrot.cl";
-#else
-static const char SPIRV_FILEPATH[] = "./mandelbrot.spv";
-#endif
 
 static constexpr u32 IMAGE_WIDTH = 3840;
 static constexpr u32 IMAGE_HEIGHT = 2160;
 static constexpr u32 IMAGE_BYTES_PER_PIXEL = 4;
 static constexpr u32 IMAGE_SIZE_BYTES = IMAGE_WIDTH * IMAGE_HEIGHT * IMAGE_BYTES_PER_PIXEL;
 
+enum class render_target_t {
+    GPU,
+    CPU,
+};
+
+struct program_options_t {
+    render_target_t render_target = render_target_t::GPU;
+    u32 nr_threads = 1;
+    u32 debug : 1 = 0;
+    u32 render_image : 1 = 1;
+} static opts;
+
+static void
+parse_args(const i32 argc, char** const argv)
+{
+    for (i32 arg_idx = 1; arg_idx < argc; ++arg_idx) {
+        if (strcmp(argv[arg_idx], "--cpu") == 0) {
+            opts.render_target = render_target_t::CPU;
+            continue;
+        }
+
+        if (strcmp(argv[arg_idx], "--gpu") == 0) {
+            opts.render_target = render_target_t::GPU;
+            continue;
+        }
+
+        if (strcmp(argv[arg_idx], "--threads") == 0) {
+            if (arg_idx+1 >= argc || sscanf(argv[arg_idx+1], "%u", &opts.nr_threads) != 1) {
+                fprintf(stderr, "--threads require an argument\n");
+                exit(1);
+            }
+
+            ++arg_idx;
+            continue;
+        }
+
+        if (strcmp(argv[arg_idx], "--no-image") == 0) {
+            opts.render_image = 0;
+            continue;
+        }
+
+        if (strcmp(argv[arg_idx], "--debug") == 0) {
+            opts.debug = 1;
+            continue;
+        }
+    }
+}
+
 #include "render.cc"
-
-static int
-load_spirv(const char* const path, char** spirv_, size_t* spirv_size_)
-{
-    struct stat spirv_stat;
-    char* spirv = NULL;
-    int fd_spirv;
-
-    fd_spirv = open(path, O_RDONLY);
-    if (fd_spirv < 0) {
-        perror("open(spirv)");
-        return 1;
-    }
-
-    if (fstat(fd_spirv, &spirv_stat)) {
-        perror("fstat");
-        // Leak the file descriptor, we are going to exit anyway
-        return 1;
-    }
-
-    spirv = static_cast<char*>(malloc(spirv_stat.st_size));
-    if (read(fd_spirv, spirv, spirv_stat.st_size) != spirv_stat.st_size) {
-        // This shouldn't happen unless the file is huge and read() bailed out
-        // early and want us to read in chunks or someone is writing to the
-        // file as we read it. In the first case, we just don't care for now. For the second case,
-        // it's just a weird state, don't even try to fallback, exit with failure.
-        //
-        // Also leak the file descriptorm, we are going to exit anyway.
-        fprintf(stderr, "Sanity check failed: amount of bytes read\n");
-        return 1;
-    }
-
-    *spirv_ = spirv;
-    *spirv_size_ = spirv_stat.st_size;
-
-    return 0;
-}
-
-static int
-bitmap_render_cl(const u32 bitmap_width, const u32 bitmap_height, u8* const bitmap)
-{
-    int err;
-
-    /* For OpenCL init itself */
-    cl_platform_id platform;
-    cl_device_id device;
-
-    /* For loading SPIRV into the GPU */
-    cl_context context;
-    cl_program program;
-    size_t spirv_size = 0;
-    char* spirv = NULL;
-
-    /* Actual work */
-    cl_command_queue queue;
-    cl_kernel kernel;
-    cl_mem output_buffer;
-    size_t local_size = 0, global_size = 0;
-    const u32 bitmap_size_bytes = bitmap_width * bitmap_height * IMAGE_BYTES_PER_PIXEL;
-
-    err = clGetPlatformIDs(1, &platform, NULL);
-    if (err < 0) {
-        fprintf(stderr, "clGetPlatformIDs: %d\n", err);
-        return 1;
-    }
-
-    err = clGetDeviceIDs(platform, CL_DEVICE_TYPE_GPU, 1, &device, NULL);
-    if (err < 0) {
-        fprintf(stderr, "clGetDeviceIDs: %d\n", err);
-        return 1;
-    }
-
-    err = load_spirv(SPIRV_FILEPATH, &spirv, &spirv_size);
-    if (err) {
-        fprintf(stderr, "Failed to load spirv: %d\n", err);
-        return 1;
-    }
-
-    context = clCreateContext(NULL, 1, &device, NULL, NULL, &err);
-    if (err < 0) {
-        fprintf(stderr, "clCreateContext: %d\n", err);
-        return 1;
-    }
-
-#if CONFIG_CL_COMPILE_ONLINE
-    const char*  sources[1]     = { spirv };
-    const size_t source_lens[1] = { spirv_size };
-    program = clCreateProgramWithSource(context, 1, sources, source_lens, &err);
-    if (err < 0) {
-        fprintf(stderr, "clCreateProgramWithSource: %d\n", err);
-        return 1;
-    }
-#else
-    program = clCreateProgramWithIL(context, spirv, spirv_size, &err);
-    if (err < 0) {
-        fprintf(stderr, "clCreateProgramWithIL: %d\n", err);
-        return 1;
-    }
-#endif
-
-    err = clBuildProgram(program, 0, NULL, NULL, NULL, NULL);
-    if (err < 0) {
-        fprintf(stderr, "clBuildProgram: %d\n", err);
-        return 1;
-    }
-
-    queue = clCreateCommandQueueWithProperties(context, device, NULL, &err);
-    if (err < 0) {
-        fprintf(stderr, "clCreateCommandQueueWithProperties: %d\n", err);
-        return 1;
-    }
-
-    kernel = clCreateKernel(program, "mandelbrot", &err);
-    if (err < 0) {
-        fprintf(stderr, "clCreateKernel: %d\n", err);
-        return 1;
-    }
-
-    output_buffer = clCreateBuffer(context, CL_MEM_WRITE_ONLY, bitmap_size_bytes, NULL, &err);
-    if (!output_buffer) {
-        fprintf(stderr, "Failed to allocate memory on the GPU: %d\n", err);
-        return 1;
-    }
-
-    err = clSetKernelArg(kernel, 0, sizeof(u32), &bitmap_width);
-    err |= clSetKernelArg(kernel, 1, sizeof(u32), &bitmap_height);
-    err |= clSetKernelArg(kernel, 2, sizeof(cl_mem), &output_buffer);
-    if (err < 0) {
-        fprintf(stderr, "Failed to set kernel args\n");
-        return 1;
-    }
-
-    err = clGetKernelWorkGroupInfo(kernel, device, CL_KERNEL_WORK_GROUP_SIZE, sizeof(local_size), &local_size, NULL);
-    if (err < 0) {
-        fprintf(stderr, "clGetKernelWorkGroupInfo: %d\n", err);
-        return 1;
-    }
-
-    global_size = bitmap_width * bitmap_height;
-    if (local_size > global_size)
-        local_size = global_size;
-
-    err = clEnqueueNDRangeKernel(queue, kernel, 1, NULL, &global_size, &local_size, 0, NULL, NULL);
-    if (err < 0) {
-        fprintf(stderr, "clEnqueueNDRangeKernel: %d\n", err);
-        return 1;
-    }
-
-    clFinish(queue);
-
-    err = clEnqueueReadBuffer(queue, output_buffer, CL_TRUE, 0, bitmap_size_bytes, bitmap, 0, NULL, NULL);
-    if (err < 0) {
-        fprintf(stderr, "clEnqueueReadBuffer: %d\n", err);
-        return 1;
-    }
-
-    clReleaseKernel(kernel);
-    clReleaseMemObject(output_buffer);
-    clReleaseCommandQueue(queue);
-    clReleaseProgram(program);
-    clReleaseContext(context);
-
-    return 0;
-}
+#include "render_opencl.cc"
+#include "render_cpu.cc"
 
 int
-main()
+main(int argc, char **argv)
 {
+    /*
+     * Parse arguments
+     */
+    parse_args(argc, argv);
+
     /*
      * Prepare the buffers
      */
     std::vector<u8> bitmap_data(IMAGE_SIZE_BYTES, 0);
 
+    timing_info_t tinfo;
+    tinfo.reserve(8);
+
     /*
      * Render the image in memory
      */
-    const int render_result = bitmap_render_cl(IMAGE_WIDTH, IMAGE_HEIGHT, std::data(bitmap_data));
+    auto& total_render_time = tinfo.emplace_back("total");
+    const int render_result = [&]{
+
+        switch (opts.render_target) {
+
+        case render_target_t::GPU:
+            return bitmap_render_cl(IMAGE_WIDTH, IMAGE_HEIGHT, std::data(bitmap_data), tinfo);
+
+        case render_target_t::CPU:
+            return bitmap_render_cpu(IMAGE_WIDTH, IMAGE_HEIGHT, std::data(bitmap_data), opts.nr_threads, tinfo);
+        }
+
+        __builtin_unreachable();
+    }();
+
+    total_render_time.stop();
+
+    for (const auto& e : tinfo) {
+        printf("%s: %luus\n", e.get_name(), e.get_duration_micro());
+    }
+
     if (render_result)
         return render_result;
 
     /*
      * Draw the rendered bitmap on screen or save to the file
      */
-    bitmap_save(std::data(bitmap_data), IMAGE_WIDTH, IMAGE_HEIGHT);
+    if (opts.render_image)
+        bitmap_save(std::data(bitmap_data), IMAGE_WIDTH, IMAGE_HEIGHT);
 
     return 0;
 }

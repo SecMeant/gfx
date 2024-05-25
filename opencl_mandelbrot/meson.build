@@ -64,7 +64,7 @@ executable(
       opencl_dep
     ],
     cpp_args: [
-      '-std=c++17',
+      '-std=c++20',
       '-Wall',
       '-Wextra',
       '-DCL_TARGET_OPENCL_VERSION=300',
