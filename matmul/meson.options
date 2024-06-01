@@ -1,0 +1,2 @@
+option('CONFIG_CL_COMPILE_ONLINE', type: 'boolean', value: true)
+
