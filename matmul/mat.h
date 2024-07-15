@@ -12,6 +12,7 @@ struct mat_t {
     using ValueType = i64;
     using ValueRef = ValueType&;
     using ValueCRef = const ValueType&;
+    using ValueCPtr = const ValueType*;
     using InitializerType = std::vector<std::vector<ValueType>>;
 
     mat_t() = default;
@@ -41,6 +42,22 @@ struct mat_t {
         ret.width = width;
         ret.height = height;
         ret.stride = stride;
+
+        return ret;
+    }
+
+    static mat_t make_matrix_from_data(const i32 *data, const u32 width, const u32 height, u32 stride = 0)
+    {
+        /* TODO: We don't always have to reallocate */
+        mat_t ret = make_matrix(width, height, stride);
+
+        auto src_row = data;
+        auto dst_row = ret.data.get();
+        for (u32 y = 0; y < height; ++y) {
+            std::copy_n(src_row, width, dst_row);
+            src_row += width;
+            dst_row += ret.stride;
+        }
 
         return ret;
     }
@@ -111,7 +128,13 @@ struct matview_t {
     using ValueCRef = const ValueType&;
     using ValuePtr = ValueType*;
 
-    matview_t() = default;
+    matview_t()
+    : data(nullptr)
+    , width(0)
+    , height(0)
+    , stride(0)
+    {}
+
     matview_t(const matview_t &other) = default;
     matview_t(matview_t &&other) = default;
     matview_t& operator=(const matview_t &other) = default;
@@ -146,6 +169,11 @@ struct matview_t {
     u32 height;
     u32 stride;
 };
+
+constexpr bool mat_dim_match(matview_t m0, matview_t m1)
+{
+    return m0.width == m1.width && m0.height == m1.height;
+}
 
 mat_t mat_add_cpu(matview_t lhs, matview_t rhs);
 mat_t mat_sub_cpu(matview_t lhs, matview_t rhs);

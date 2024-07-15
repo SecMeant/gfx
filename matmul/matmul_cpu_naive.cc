@@ -40,8 +40,8 @@ mat_t mat_mul_cpu(matview_t lhs, matview_t rhs)
 
     for (u32 y = 0; y < lhs.height; ++y)
         for (u32 x = 0; x < lhs.width; ++x)
-            for (u32 stroke = 0; stroke < lhs.width; ++stroke)
-                out[x,y] += lhs[stroke,y] * rhs[x,stroke];
+            for (u32 i = 0; i < lhs.width; ++i)
+                out[x,y] += lhs[i,y] * rhs[x,i];
 
     return out;
 }
