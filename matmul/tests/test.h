@@ -3,7 +3,9 @@
 #include <exception>
 #include <string>
 
-struct {
+#include "mat.h"
+
+struct [[maybe_unused]] {
     size_t num_tests;
     size_t num_failed;
 } inline test_stats;
@@ -31,15 +33,36 @@ struct test_failure : public std::exception {
     std::string message;
 };
 
-#define RUN_TEST(test) \
+#define RUN_TEST(test, ...) \
     do { \
         try { \
             ++test_stats.num_tests; \
-            test(); \
+            test(__VA_ARGS__); \
         } catch (const std::exception &e) { \
             printf(STR(test) ": %s\n", e.what()); \
             ++test_stats.num_failed; \
         } \
     } while(0)
+
+enum mat_op {
+    none,
+    mul,
+};
+
+/*
+ * Compares matrices, actual and expected.
+ * If they miscompare, prints at which offset the miscompare happened.
+ *
+ * Optionally takes lhs, rhs matrices and operation that produced the result.
+ * They are used to print more context, useful when debugging.
+ */
+void mat_compare_or_fail(
+    const char *test_name,
+    matview_t actual,
+    matview_t expected,
+    matview_t lhs = matview_t(),
+    matview_t rhs = matview_t(),
+    mat_op op = mat_op::none
+);
 
 

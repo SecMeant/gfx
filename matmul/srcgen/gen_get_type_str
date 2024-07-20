@@ -1,0 +1,40 @@
+#!/bin/python
+
+from sys import argv, stdout
+
+if len(argv) < 2:
+    fout = stdout
+else:
+    fout = open(argv[1], 'w')
+
+TYPES = [
+    "u8",
+    "u16",
+    "u32",
+    "u64",
+
+    "i8",
+    "i16",
+    "i32",
+    "i64",
+
+    "f32",
+    "f64",
+]
+
+fout.write('''#pragma once
+#include "types.h"
+#include <type_traits>
+
+template <typename T>
+static consteval const char * get_type_str_()
+{
+''')
+
+for type in TYPES:
+    fout.write(f'''    if constexpr(std::is_same_v<T, {type}>)
+        return " {type}";
+
+''')
+
+fout.write('    return "";\n}\n')
