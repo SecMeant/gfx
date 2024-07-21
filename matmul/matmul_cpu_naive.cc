@@ -107,13 +107,13 @@ mat_t strassen_cpu(matview_t lhs, matview_t rhs)
     matview_t b21(&rhs[0,quarter_size], quarter_size, quarter_size, rhs.stride);
     matview_t b22(&rhs[quarter_size,quarter_size], quarter_size, quarter_size, rhs.stride);
 
-    mat_t m1 = mat_mul_cpu(mat_add_cpu(a11, a22), mat_add_cpu(b11, b22));
-    mat_t m2 = mat_mul_cpu(mat_add_cpu(a21, a22), b11);
-    mat_t m3 = mat_mul_cpu(a11, mat_sub_cpu(b12, b22));
-    mat_t m4 = mat_mul_cpu(a22, mat_sub_cpu(b21, b11));
-    mat_t m5 = mat_mul_cpu(mat_add_cpu(a11, a12), b22);
-    mat_t m6 = mat_mul_cpu(mat_sub_cpu(a21, a11), mat_add_cpu(b11, b12));
-    mat_t m7 = mat_mul_cpu(mat_sub_cpu(a12, a22), mat_add_cpu(b21, b22));
+    mat_t m1 = strassen_cpu(mat_add_cpu(a11, a22), mat_add_cpu(b11, b22));
+    mat_t m2 = strassen_cpu(mat_add_cpu(a21, a22), b11);
+    mat_t m3 = strassen_cpu(a11, mat_sub_cpu(b12, b22));
+    mat_t m4 = strassen_cpu(a22, mat_sub_cpu(b21, b11));
+    mat_t m5 = strassen_cpu(mat_add_cpu(a11, a12), b22);
+    mat_t m6 = strassen_cpu(mat_sub_cpu(a21, a11), mat_add_cpu(b11, b12));
+    mat_t m7 = strassen_cpu(mat_sub_cpu(a12, a22), mat_add_cpu(b21, b22));
 
     matview_t c11(&out[0,0], quarter_size, quarter_size, out.stride);
     matview_t c12(&out[quarter_size,0], quarter_size, quarter_size, out.stride);
