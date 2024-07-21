@@ -15,6 +15,7 @@ cpp_args_common = [
 libmatmul_src = [
     'matmul_cpu_naive.cc',
     'random.cc',
+    'threading.cc',
 ]
 
 libmatmul = static_library(
@@ -46,6 +47,7 @@ executable(
 
 test_src = [
   'tests/test.cc',
+  'tests/threading_test.cc',
   'tests/test_against_pytorch.cc',
   get_type_name_h,
 ]
@@ -60,4 +62,3 @@ executable(
   link_with: libmatmul,
   include_directories: ['../']
 )
-

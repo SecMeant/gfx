@@ -200,9 +200,13 @@ static void test_matrix_simple_strassen_mul()
 }
 
 void test_matrix_vs_pytorch(const char *safetensors_path);
+void test_threading(bool explicit_exit);
 
 int main()
 {
+    RUN_TEST(test_threading, false);
+    RUN_TEST(test_threading, true);
+
     RUN_TEST(test_matrix_simple_add);
     RUN_TEST(test_matrix_simple_mul);
     RUN_TEST(test_matrix_simple_strassen_mul);
