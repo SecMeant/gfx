@@ -4,6 +4,7 @@
 #include <string>
 
 #include "mat.h"
+#include "ansi_codes.h"
 
 struct [[maybe_unused]] {
     size_t num_tests;
@@ -35,13 +36,17 @@ struct test_failure : public std::exception {
 
 #define RUN_TEST(test, ...) \
     do { \
+        printf(STR(test) ": ..."); \
+        fflush(stdout); \
         try { \
             ++test_stats.num_tests; \
             test(__VA_ARGS__); \
+            printf("\b \b\b\b" CLR_GREEN "OK\n" CLR_RESET); \
         } catch (const std::exception &e) { \
-            printf(STR(test) ": %s\n", e.what()); \
+            printf("\b\b\b" CLR_RED "Failed: %s\n" CLR_RESET, e.what()); \
             ++test_stats.num_failed; \
         } \
+        fflush(stdout); \
     } while(0)
 
 enum mat_op {

@@ -214,7 +214,7 @@ int main()
     RUN_TEST(test_matrix_vs_pytorch, CONFIG_TEST_FILES_PATH "pytorch_64x64.safetensors");
     RUN_TEST(test_matrix_vs_pytorch, CONFIG_TEST_FILES_PATH "pytorch_128x128.safetensors");
 
-    printf("Tests run   : %zu\nTests failed: %zu\n",
+    printf("\nTests run   : %zu\nTests failed: %zu\n",
            test_stats.num_tests, test_stats.num_failed);
 
     return 0;
