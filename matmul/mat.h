@@ -128,7 +128,7 @@ struct matview_t {
     using ValueCRef = const ValueType&;
     using ValuePtr = ValueType*;
 
-    matview_t()
+    constexpr matview_t()
     : data(nullptr)
     , width(0)
     , height(0)
@@ -181,4 +181,8 @@ mat_t mat_mul_cpu(matview_t lhs, matview_t rhs);
 void mat_copy(matview_t dst, matview_t src);
 
 mat_t strassen_cpu(matview_t lhs, matview_t rhs);
+
+mat_t mat_add_cl(matview_t lhs, matview_t rhs);
+mat_t mat_sub_cl(matview_t lhs, matview_t rhs);
+mat_t mat_mul_cl(matview_t lhs, matview_t rhs);
 

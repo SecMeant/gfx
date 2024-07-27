@@ -1,15 +1,24 @@
 #pragma once
 
+#include <atomic>
 #include <exception>
 #include <string>
+#include <functional>
+
+#include <fmt/format.h>
 
 #include "mat.h"
 #include "ansi_codes.h"
 
 struct [[maybe_unused]] {
-    size_t num_tests;
-    size_t num_failed;
+    std::atomic_uint64_t num_tests = 0;
+    std::atomic_uint64_t num_failed = 0;
 } inline test_stats;
+
+struct test {
+    std::string name;
+    std::function<void()> func;
+};
 
 #define STR_(x) #x
 #define STR(x) STR_(x)
@@ -33,21 +42,6 @@ struct test_failure : public std::exception {
 
     std::string message;
 };
-
-#define RUN_TEST(test, ...) \
-    do { \
-        printf(STR(test) ": ..."); \
-        fflush(stdout); \
-        try { \
-            ++test_stats.num_tests; \
-            test(__VA_ARGS__); \
-            printf("\b \b\b\b" CLR_GREEN "OK\n" CLR_RESET); \
-        } catch (const std::exception &e) { \
-            printf("\b\b\b" CLR_RED "Failed: %s\n" CLR_RESET, e.what()); \
-            ++test_stats.num_failed; \
-        } \
-        fflush(stdout); \
-    } while(0)
 
 enum mat_op {
     none,

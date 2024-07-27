@@ -105,8 +105,10 @@ void thread_pool::sync()
     this->wctx.cv_finished.wait(lck, [this]{ return this->wctx.bits_pending.none(); });
 }
 
-void thread_pool::resize(const u32 num_threads)
+void thread_pool::resize(const u32 num_threads_)
 {
+    const u32 num_threads = std::min(num_threads_, CONFIG_MAX_THREADS);
+
     /*
      * This will may block for a while if the threads are working.
      * Keep that in mind.

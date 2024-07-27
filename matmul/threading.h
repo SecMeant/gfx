@@ -44,6 +44,7 @@ private:
 
 public:
     thread_pool() = default;
+    thread_pool(u32 num_threads) { this->resize(num_threads); }
     ~thread_pool() { this->exit_threads(); }
 
     void schedule(WorkType work);

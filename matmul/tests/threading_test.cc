@@ -4,7 +4,7 @@
 
 #include <fmt/format.h>
 
-const u32 thread_pool_sizes[] = {
+constexpr u32 thread_pool_sizes[] = {
     0, 1, 5, 13, 16, 32, 64
 };
 
