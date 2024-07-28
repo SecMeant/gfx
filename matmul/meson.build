@@ -10,6 +10,14 @@ cpp_args_common = [
   '-std=c++23',
   '-Wall',
   '-Wextra',
+
+  #
+  # Clang complains about passing plain, "runtime",
+  # strings as the format and only parameter to the printf.
+  #
+  # Just shut it's mouth. Clang's just wrong.
+  #
+  '-Wno-format-security',
 ]
 
 libmatmul_src = [
