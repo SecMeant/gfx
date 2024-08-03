@@ -1,8 +1,12 @@
 project('matmul', 'cpp')
 
+conf = configuration_data()
+summary_info = {}
+
 fmt = dependency('fmt', required: true)
 mipc = dependency('mipc', required: true)
 rapidjson = dependency('RapidJSON', required: true)
+opencl = dependency('OpenCL', required: true)
 
 test_files_path = meson.source_root() + '/tests/files/'
 
@@ -18,10 +22,21 @@ cpp_args_common = [
   # Just shut it's mouth. Clang's just wrong.
   #
   '-Wno-format-security',
+
+  '-DCL_TARGET_OPENCL_VERSION=300',
 ]
+
+conf.set_quoted('CONFIG_CL_MATMUL_KERNEL_SRC', meson.source_root() / 'matmul.cl')
+
+foreach key : conf.keys()
+  summary_info += {key: conf.get(key)}
+endforeach
+
+config_header = configure_file(output: 'config.h', configuration: conf)
 
 libmatmul_src = [
     'matmul_cpu_naive.cc',
+    'matmul_opencl.cc',
     'random.cc',
     'threading.cc',
 ]
@@ -29,11 +44,13 @@ libmatmul_src = [
 libmatmul = static_library(
   'matmul',
   libmatmul_src,
+  config_header,
   cpp_args: cpp_args_common,
   dependencies: [
     fmt,
     mipc,
     rapidjson,
+    opencl,
   ],
 )
 

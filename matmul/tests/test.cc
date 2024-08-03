@@ -206,6 +206,43 @@ static void test_matrix_simple_strassen_mul()
             TEST_ASSERT((out0[x, y] == out1[x, y]));
 }
 
+static void test_matrix_simple_opencl_mul()
+{
+    using init_t = mat_t::InitializerType;
+
+    const init_t lhs_data = {
+        {1,  2,  3,  4 , 1,  2,  3,  4 },
+        {11, 12, 13, 14, 11, 12, 13, 14},
+        {21, 22, 23, 24, 21, 22, 23, 24},
+        {45, 98, 66, 0 , 45, 98, 66, 0 },
+        {1,  2,  3,  4 , 1,  2,  3,  4 },
+        {11, 12, 13, 14, 11, 12, 13, 14},
+        {21, 22, 23, 24, 21, 22, 23, 24},
+        {45, 98, 66, 0 , 45, 98, 66, 0 },
+    };
+
+    const init_t rhs_data = {
+        {4,  2, 3,  5, 4,  2, 3,  5},
+        {87, 4, 16, 4, 87, 4, 16, 4},
+        {12, 2, 4,  4, 12, 2, 4,  4},
+        {4,  3, 1,  9, 4,  3, 1,  9},
+        {4,  2, 3,  5, 4,  2, 3,  5},
+        {87, 4, 16, 4, 87, 4, 16, 4},
+        {12, 2, 4,  4, 12, 2, 4,  4},
+        {4,  3, 1,  9, 4,  3, 1,  9},
+    };
+
+    const auto lhs = mat_t(lhs_data);
+    const auto rhs = mat_t(rhs_data);
+
+    const auto out0 = mat_mul_cl(lhs, rhs);
+    const auto out1 = mat_mul_cpu(lhs, rhs);
+
+    for (u32 y = 0; y < out0.height; ++y)
+        for (u32 x = 0; x < out0.width; ++x)
+            TEST_ASSERT((out0[x, y] == out1[x, y]));
+}
+
 void test_matrix_vs_pytorch(const char *safetensors_path);
 void test_threading(bool explicit_exit);
 
@@ -236,7 +273,8 @@ static void RUN_TEST(const test& test)
 int main()
 {
     const std::vector<test> tests {
-        test{
+        /* SIMPLE CPU TESTS */
+        {
             .name = "test_threading(explicit_exit = 0)",
             .func = std::bind(test_threading, false),
         },
@@ -256,6 +294,16 @@ int main()
             .name = "test_matrix_simple_strassen_mul",
             .func = std::bind(test_matrix_simple_strassen_mul),
         },
+
+
+        /* SIMPLE OPENCL TESTS */
+        {
+            .name = "test_matrix_simple_opencl_mul",
+            .func = std::bind(test_matrix_simple_opencl_mul),
+        },
+
+
+        /* SAFETENSORS TESTS */
         {
             .name = "test_matrix_vs_pytorch(pytorch_4x4.safetensors)",
             .func = std::bind(test_matrix_vs_pytorch, CONFIG_TEST_FILES_PATH "pytorch_4x4.safetensors"),

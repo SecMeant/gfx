@@ -17,6 +17,23 @@ struct mat_t {
 
     mat_t() = default;
 
+    mat_t(mat_t &&other)
+    :data(std::move(other.data))
+    ,width(other.width)
+    ,height(other.height)
+    ,stride(other.stride)
+    { }
+
+    mat_t& operator=(mat_t &&other)
+    {
+        this->data = std::move(other.data);
+        this->width = other.width;
+        this->height = other.height;
+        this->stride = other.stride;
+
+        return *this;
+    }
+
     mat_t(const InitializerType& init)
     {
         const auto height = init.size();
@@ -96,6 +113,11 @@ struct mat_t {
         return this->height * this->stride;
     }
 
+    size_t size_bytes() const
+    {
+        return this->num_elems() * sizeof(ValueType);
+    }
+
     void set_zero()
     {
         std::fill(this->data.get(), this->data.get() + this->num_elems(), 0);
@@ -162,6 +184,16 @@ struct matview_t {
     ValueCRef operator[](u32 x, u32 y) const
     {
         return this->data[y * this->stride + x];
+    }
+
+    size_t num_elems() const
+    {
+        return this->height * this->stride;
+    }
+
+    size_t size_bytes() const
+    {
+        return this->num_elems() * sizeof(ValueType);
     }
 
     ValuePtr data;
