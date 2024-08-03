@@ -21,7 +21,7 @@ __kernel void matmul(
     if (y >= out_rows)
         return;
 
-    out[thread_id] = 0;
+    out[x + y * out_stride] = 0;
 
     /* We assert: lhs_cols == rhs_rows */
 
