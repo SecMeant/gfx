@@ -1,3 +1,5 @@
+#include <mutex>
+
 #include <CL/cl.h>
 
 #include <mipc/file.h>
@@ -5,38 +7,47 @@
 #include "mat.h"
 #include "config.h"
 
+using mipc::finbuf;
+
+std::mutex kctx_mtx;
+struct cl_kernel_context
+{
+    bool initialized;
+    cl_device_id device;
+    cl_context context;
+    cl_program program;
+    finbuf kernel_source;
+
+    cl_kernel_context() = default;
+
+    ~cl_kernel_context()
+    {
+        std::unique_lock lck(kctx_mtx);
+
+        if (!this->initialized)
+            return;
+
+        clReleaseProgram(this->program);
+        clReleaseContext(this->context);
+        this->initialized = false;
+    }
+} kctx;
+
 static u32 cl_size_round(u32 size_bytes)
 {
     constexpr u32 alignment_bytes = 64;
     return (size_bytes + alignment_bytes-1) & (~(alignment_bytes-1));
 }
 
-static int run_kernel(matview_t lhs, matview_t rhs, mat_t &out_)
+static int init_kernel_context_(struct cl_kernel_context &kctx)
 {
-    using mipc::finbuf;
-
     int err;
 
-    /* For OpenCL init itself */
     cl_platform_id platform;
     cl_device_id device;
-
-    /* For loading SPIRV into the GPU */
     cl_context context;
     cl_program program;
     finbuf kernel_source;
-
-    /* Actual work */
-    mat_t out = mat_t::make_matrix_zero(lhs.height, rhs.width);
-    cl_command_queue queue;
-    cl_kernel kernel;
-    cl_mem cl_out_buffer;
-    cl_mem cl_lhs_buffer;
-    cl_mem cl_rhs_buffer;
-    u32 cl_out_buffer_size = cl_size_round(out.size_bytes());
-    u32 cl_lhs_buffer_size = cl_size_round(lhs.size_bytes());
-    u32 cl_rhs_buffer_size = cl_size_round(rhs.size_bytes());
-    size_t local_size = 0, global_size = 0;
 
     err = clGetPlatformIDs(1, &platform, NULL);
     if (err < 0) {
@@ -75,6 +86,57 @@ static int run_kernel(matview_t lhs, matview_t rhs, mat_t &out_)
         fprintf(stderr, "clBuildProgram: %d\n", err);
         return 1;
     }
+
+    kctx.device = device;
+    kctx.context = context;
+    kctx.program = program;
+    kctx.kernel_source = std::move(kernel_source);
+
+    return 0;
+}
+
+static int init_kernel_context()
+{
+    int ret;
+
+    std::unique_lock lck(kctx_mtx);
+
+    if (kctx.initialized) [[likely]]
+        return 0;
+
+    ret = init_kernel_context_(kctx);
+
+    if (ret)
+        return ret;
+
+    kctx.initialized = true;
+    return 0;
+}
+
+
+static int run_kernel(matview_t lhs, matview_t rhs, mat_t &out_)
+{
+    int err;
+
+    /* Actual work */
+    mat_t out = mat_t::make_matrix_zero(lhs.height, rhs.width);
+    cl_command_queue queue;
+    cl_kernel kernel;
+    cl_mem cl_out_buffer;
+    cl_mem cl_lhs_buffer;
+    cl_mem cl_rhs_buffer;
+    u32 cl_out_buffer_size = cl_size_round(out.size_bytes());
+    u32 cl_lhs_buffer_size = cl_size_round(lhs.size_bytes());
+    u32 cl_rhs_buffer_size = cl_size_round(rhs.size_bytes());
+    size_t local_size = 0, global_size = 0;
+
+    err = init_kernel_context();
+    if (err)
+        return err;
+
+    cl_device_id device = kctx.device;
+    cl_context context = kctx.context;
+    cl_program program = kctx.program;
 
     queue = clCreateCommandQueueWithProperties(context, device, NULL, &err);
     if (err < 0) {
@@ -169,8 +231,6 @@ static int run_kernel(matview_t lhs, matview_t rhs, mat_t &out_)
     clReleaseMemObject(cl_lhs_buffer);
     clReleaseKernel(kernel);
     clReleaseCommandQueue(queue);
-    clReleaseProgram(program);
-    clReleaseContext(context);
 
     out_ = std::move(out);
 
