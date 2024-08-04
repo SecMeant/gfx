@@ -8,7 +8,7 @@
 #include <fmt/format.h>
 
 #include "mat.h"
-#include "ansi_codes.h"
+#include "../ansi_codes.h"
 
 struct [[maybe_unused]] {
     std::atomic_uint64_t num_tests = 0;

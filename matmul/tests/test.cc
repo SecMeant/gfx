@@ -6,6 +6,8 @@
 
 #include <fmt/format.h>
 
+#include "matmul_cuda.h"
+
 #include "test.h"
 #include "mat.h"
 #include "print_utils.h"
@@ -270,7 +272,7 @@ static void RUN_TEST(const test& test)
     }
 }
 
-int main()
+int run_tests()
 {
     const std::vector<test> tests {
         /* SIMPLE CPU TESTS */
@@ -357,3 +359,30 @@ int main()
 
     return 0;
 }
+
+int main(int argc, char **argv)
+{
+    bool opt_list_cuda = false;
+
+    for (int arg = 1; arg < argc; ++arg) {
+        const char *s = argv[arg];
+
+        if (strcmp(s, "-h") == 0 || strcmp(s, "--help") == 0) {
+            printf("Usage: %s OPTIONS\n", argv[0]);
+            printf("  -lc, --list-cuda    List available cuda devices\n");
+            return 0;
+        }
+
+        if (strcmp(s, "-lc") == 0 || strcmp(s, "--list-cuda") == 0) {
+            opt_list_cuda = true;
+            continue;
+        }
+    }
+
+    matmul_cu_init(opt_list_cuda);
+    if (opt_list_cuda)
+        return 0;
+
+    return run_tests();
+}
+

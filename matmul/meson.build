@@ -1,4 +1,4 @@
-project('matmul', 'cpp')
+project('matmul', ['cpp', 'cuda'])
 
 conf = configuration_data()
 summary_info = {}
@@ -7,6 +7,7 @@ fmt = dependency('fmt', required: true)
 mipc = dependency('mipc', required: true)
 rapidjson = dependency('RapidJSON', required: true)
 opencl = dependency('OpenCL', required: true)
+cuda = dependency('cuda', required: true)
 
 test_files_path = meson.source_root() + '/tests/files/'
 
@@ -39,19 +40,21 @@ libmatmul_src = [
     'matmul_opencl.cc',
     'random.cc',
     'threading.cc',
+    'matmul_cuda.cu',
 ]
 
 libmatmul = static_library(
-  'matmul',
-  libmatmul_src,
-  config_header,
-  cpp_args: cpp_args_common,
-  dependencies: [
-    fmt,
-    mipc,
-    rapidjson,
-    opencl,
-  ],
+    'matmul',
+    libmatmul_src,
+    config_header,
+    cpp_args: cpp_args_common,
+    dependencies: [
+        fmt,
+        mipc,
+        rapidjson,
+        opencl,
+        cuda,
+    ],
 )
 
 python3 = find_program('python3')

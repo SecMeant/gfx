@@ -225,6 +225,16 @@ void test_matrix_vs_pytorch(const char * const filepath)
 
         test_name = fmt::format("{}.{}.{}", filepath, test_id, "cl");
         mat_compare_or_fail(test_name.c_str(), matc_computed_cl, matc_expected, mata, matb, mat_op::mul);
+
+
+        /* Test using cuda kernel */
+        mat_t matc_computed_cu = mat_mul_cu(mata, matb);
+
+        TEST_ASSERT(matc_expected.width == matc_computed_cl.width);
+        TEST_ASSERT(matc_expected.height == matc_computed_cl.height);
+
+        test_name = fmt::format("{}.{}.{}", filepath, test_id, "cu");
+        mat_compare_or_fail(test_name.c_str(), matc_computed_cu, matc_expected, mata, matb, mat_op::mul);
     }
 }
 
