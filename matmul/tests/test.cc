@@ -13,6 +13,7 @@
 #include "print_utils.h"
 #include "get_type_name.h"
 #include "threading.h"
+#include "timing.h"
 
 constexpr bool VERBOSE = true;
 
@@ -252,14 +253,61 @@ static std::queue<std::string> test_status;
 static std::mutex test_status_mtx;
 static std::condition_variable test_status_cv;
 
+static void append_time_string(std::string &out, timeit_t::Duration duration)
+{
+    using std::chrono::duration_cast;
+    using std::chrono::nanoseconds;
+    using std::chrono::microseconds;
+    using std::chrono::milliseconds;
+    using std::chrono::seconds;
+    using std::to_string;
+
+    const auto dur_secs = duration_cast<seconds>(duration);
+    if (dur_secs.count() != 0) {
+        out += to_string(dur_secs.count());
+        out += "s ";
+        duration -= dur_secs;
+    }
+
+    const auto dur_ms = duration_cast<milliseconds>(duration);
+    if (dur_ms.count() != 0) {
+        out += to_string(dur_ms.count());
+        out += "ms ";
+        duration -= dur_ms;
+    }
+
+    const auto dur_us = duration_cast<microseconds>(duration);
+    if (dur_us.count() != 0) {
+        out += to_string(dur_us.count());
+        out += "us ";
+        duration -= dur_us;
+    }
+
+    const auto dur_ns = duration_cast<nanoseconds>(duration);
+    if (dur_ns.count() != 0) {
+        out += to_string(dur_ns.count());
+        out += "ns ";
+        duration -= dur_ns;
+    }
+
+    out += '\n';
+}
+
 static void RUN_TEST(const test& test)
 {
+
     std::string status;
 
     try {
         test_stats.num_tests.fetch_add(1, std::memory_order_relaxed);
+
+        timeit_t timer(test.name);
         test.func();
-        status = fmt::format("{}: " CLR_GREEN "OK\n" CLR_RESET, test.name);
+        timer.stop();
+
+        status = fmt::format("{}: " CLR_GREEN "OK " CLR_RESET, test.name);
+        append_time_string(status, timer.get_duration());
+
     } catch (const std::exception &e) {
         status = fmt::format("{}: " CLR_RED "Failed: {}\n" CLR_RESET, test.name, e.what());
         test_stats.num_failed.fetch_add(1, std::memory_order_relaxed);

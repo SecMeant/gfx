@@ -27,3 +27,9 @@ auto scast(U&& arg)
     return static_cast<T>(std::forward<U>(arg));
 }
 
+template <typename T>
+constexpr auto ucast(T&& e)
+{
+        return static_cast<std::underlying_type_t<std::remove_reference_t<T>>>(e);
+}
+
