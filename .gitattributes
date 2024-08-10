@@ -1,0 +1,2 @@
+matmul/tests/files/pytorch_512x512.safetensors filter=lfs diff=lfs merge=lfs -text
+matmul/tests/files/pytorch_1024x1024.safetensors filter=lfs diff=lfs merge=lfs -text
