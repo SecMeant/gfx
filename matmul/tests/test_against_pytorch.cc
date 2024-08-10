@@ -15,6 +15,8 @@
 #include "mat.h"
 #include "types.h"
 #include "print_utils.h"
+#include "timing.h"
+#include "bench.h"
 
 struct safetensor_i32 {
     // Shape
@@ -33,6 +35,15 @@ struct test_tripplet {
 static mat_t make_mat_from_tensor_data(const safetensor_i32 &tensor)
 {
     return mat_t::make_matrix_from_data(tensor.data, tensor.cols, tensor.rows);
+}
+
+static const char* filename_from_path(std::string_view filepath)
+{
+    const auto pos = filepath.find_last_of('/');
+    if (pos == std::string_view::npos)
+        return filepath.begin();
+
+    return &filepath[pos+1];
 }
 
 void test_matrix_vs_pytorch(const char * const filepath)
@@ -176,6 +187,8 @@ void test_matrix_vs_pytorch(const char * const filepath)
         }
     }
 
+    const char * const filename = filename_from_path(filepath);
+    timeit_t timer;
 
     /*
      * Convert safetensor file data to internal format.
@@ -186,6 +199,8 @@ void test_matrix_vs_pytorch(const char * const filepath)
         const auto& tensa   = ttrip.second.a;
         const auto& tensb   = ttrip.second.b;
         const auto& tensc   = ttrip.second.c;
+
+        constexpr u32 align = 32u;
 
         if (tensa.data == nullptr || tensb.data == nullptr || tensc.data == nullptr)
             throw test_failure(fmt::format("Incomplete data for id{}\n", test_id));
@@ -198,7 +213,10 @@ void test_matrix_vs_pytorch(const char * const filepath)
 
 
         /* Test using mat_mul_cpu() */
+        timer.start();
         mat_t matc_computed = mat_mul_cpu(mata, matb);
+        timer.stop();
+        benchinfo.add(fmt::format("{: <{}}mat_mul_cpu", filename, align), timer.get_duration());
 
         TEST_ASSERT(matc_expected.width == matc_computed.width);
         TEST_ASSERT(matc_expected.height == matc_computed.height);
@@ -208,7 +226,10 @@ void test_matrix_vs_pytorch(const char * const filepath)
 
 
         /* Test using strassen_cpu() */
+        timer.start();
         mat_t matc_computed_strassen = strassen_cpu(mata, matb);
+        timer.stop();
+        benchinfo.add(fmt::format("{: <{}}strassen_cpu", filename, align), timer.get_duration());
 
         TEST_ASSERT(matc_expected.width == matc_computed_strassen.width);
         TEST_ASSERT(matc_expected.height == matc_computed_strassen.height);
@@ -218,7 +239,10 @@ void test_matrix_vs_pytorch(const char * const filepath)
 
 
         /* Test using opencl kernel */
+        timer.start();
         mat_t matc_computed_cl = mat_mul_cl(mata, matb);
+        timer.stop();
+        benchinfo.add(fmt::format("{: <{}}mat_mul_cl", filename, align), timer.get_duration());
 
         TEST_ASSERT(matc_expected.width == matc_computed_cl.width);
         TEST_ASSERT(matc_expected.height == matc_computed_cl.height);
@@ -228,7 +252,10 @@ void test_matrix_vs_pytorch(const char * const filepath)
 
 
         /* Test using cuda kernel */
+        timer.start();
         mat_t matc_computed_cu = mat_mul_cu(mata, matb);
+        timer.stop();
+        benchinfo.add(fmt::format("{: <{}}mat_mul_cu", filename, align), timer.get_duration());
 
         TEST_ASSERT(matc_expected.width == matc_computed_cl.width);
         TEST_ASSERT(matc_expected.height == matc_computed_cl.height);

@@ -35,14 +35,7 @@ private:
     }
 
 public:
-    timeit_t(const std::string &name): timeit_t(name.c_str()) {}
-
-    timeit_t(const char *name)
-    : state(clock_state_t::idle)
-    {
-        strncpy(std::data(this->name), name, std::size(this->name) - 1);
-        this->start();
-    }
+    timeit_t(): state(clock_state_t::idle) {}
 
     timeit_t(const timeit_t &other) = default;
 
@@ -52,19 +45,11 @@ public:
 
     timeit_t& operator=(timeit_t &&other) = default;
 
-    ~timeit_t()
-    {
-        if (this->state != clock_state_t::finished)
-            panic("timeit: destroying non-finished clock (%s, %s)\n",
-                  this->name, state_to_str(this->state));
-    }
+    ~timeit_t() = default;
 
     void
     start()
     {
-        if (this->state != clock_state_t::idle) [[unlikely]]
-            panic("timeit: tried to start a non-idle clock\n");
-
         barrier();
 
         this->time_start = ClockType::now();
@@ -74,20 +59,11 @@ public:
     void
     stop()
     {
-        if (this->state != clock_state_t::started) [[unlikely]]
-            panic("timeit: tried to stop a non-started clock\n");
-
         barrier();
         // TODO: should we also do HW barrier?
 
         this->time_end = ClockType::now();
         this->state = clock_state_t::finished;
-    }
-
-    const char*
-    get_name() const
-    {
-        return this->name;
     }
 
     Duration
@@ -109,7 +85,6 @@ public:
     }
 
 private:
-    char name[16];
     clock_state_t state;
     TimePoint time_start;
     TimePoint time_end;
