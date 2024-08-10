@@ -15,6 +15,7 @@
 #include "threading.h"
 #include "timing.h"
 #include "bench.h"
+#include "options.h"
 
 constexpr bool VERBOSE = true;
 
@@ -396,11 +397,19 @@ int run_tests()
         },
     };
 
-    long int num_cpus_online = sysconf(_SC_NPROCESSORS_ONLN);
-    if (num_cpus_online <= 0)
-        num_cpus_online = 4;
+    const u32 num_threads = [&] {
+        if (opt_num_threads != 0)
+            return opt_num_threads;
 
-    const u32 num_threads = std::min(tests.size(), static_cast<size_t>(num_cpus_online));
+        long int num_cpus_online = sysconf(_SC_NPROCESSORS_ONLN);
+        if (num_cpus_online <= 0)
+            num_cpus_online = 4;
+
+        const u32 num_threads = std::min(tests.size(), static_cast<size_t>(num_cpus_online));
+
+        return num_threads;
+    }();
+
     thread_pool threads(num_threads);
 
     threads.schedule([&](u32 thread_id) {
@@ -439,9 +448,7 @@ int run_tests()
 int main(int argc, char **argv)
 {
     int ret = 0;
-
-    bool opt_list_cuda = false;
-    bool opt_bench = false;
+    u32 num_threads = 0;
 
     for (int arg = 1; arg < argc; ++arg) {
         const char *s = argv[arg];
@@ -459,6 +466,11 @@ int main(int argc, char **argv)
 
         if (strcmp(s, "--bench") == 0) {
             opt_bench = true;
+            continue;
+        }
+
+        if (sscanf(s, "-n%u", &num_threads) == 1 || sscanf(s, "--threads%u", &num_threads)) {
+            opt_num_threads = num_threads;
             continue;
         }
     }
