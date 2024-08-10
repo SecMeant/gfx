@@ -46,7 +46,7 @@ static const char* filename_from_path(std::string_view filepath)
     return &filepath[pos+1];
 }
 
-void test_matrix_vs_pytorch(const char * const filepath)
+void test_matrix_vs_pytorch(const char * const filepath, test_flags_t flags)
 {
     auto ftensors = mipc::finbuf(filepath);
     if (!ftensors)
@@ -201,6 +201,8 @@ void test_matrix_vs_pytorch(const char * const filepath)
         const auto& tensc   = ttrip.second.c;
 
         constexpr u32 align = 32u;
+        std::string test_name;
+        const bool run_on_cpu = !flags.skip_cpu;
 
         if (tensa.data == nullptr || tensb.data == nullptr || tensc.data == nullptr)
             throw test_failure(fmt::format("Incomplete data for id{}\n", test_id));
@@ -212,30 +214,32 @@ void test_matrix_vs_pytorch(const char * const filepath)
         mat_t matc_expected = make_mat_from_tensor_data(tensc);
 
 
-        /* Test using mat_mul_cpu() */
-        timer.start();
-        mat_t matc_computed = mat_mul_cpu(mata, matb);
-        timer.stop();
-        benchinfo.add(fmt::format("{: <{}}mat_mul_cpu", filename, align), timer.get_duration());
+        if (run_on_cpu) {
+            /* Test using mat_mul_cpu() */
+            timer.start();
+            mat_t matc_computed = mat_mul_cpu(mata, matb);
+            timer.stop();
+            benchinfo.add(fmt::format("{: <{}}mat_mul_cpu", filename, align), timer.get_duration());
 
-        TEST_ASSERT(matc_expected.width == matc_computed.width);
-        TEST_ASSERT(matc_expected.height == matc_computed.height);
+            TEST_ASSERT(matc_expected.width == matc_computed.width);
+            TEST_ASSERT(matc_expected.height == matc_computed.height);
 
-        auto test_name = fmt::format("{}.{}.{}", filepath, test_id, "mat_mul_cpu");
-        mat_compare_or_fail(test_name.c_str(), matc_computed, matc_expected, mata, matb, mat_op::mul);
+            test_name = fmt::format("{}.{}.{}", filepath, test_id, "mat_mul_cpu");
+            mat_compare_or_fail(test_name.c_str(), matc_computed, matc_expected, mata, matb, mat_op::mul);
 
 
-        /* Test using strassen_cpu() */
-        timer.start();
-        mat_t matc_computed_strassen = strassen_cpu(mata, matb);
-        timer.stop();
-        benchinfo.add(fmt::format("{: <{}}strassen_cpu", filename, align), timer.get_duration());
+            /* Test using strassen_cpu() */
+            timer.start();
+            mat_t matc_computed_strassen = strassen_cpu(mata, matb);
+            timer.stop();
+            benchinfo.add(fmt::format("{: <{}}strassen_cpu", filename, align), timer.get_duration());
 
-        TEST_ASSERT(matc_expected.width == matc_computed_strassen.width);
-        TEST_ASSERT(matc_expected.height == matc_computed_strassen.height);
+            TEST_ASSERT(matc_expected.width == matc_computed_strassen.width);
+            TEST_ASSERT(matc_expected.height == matc_computed_strassen.height);
 
-        test_name = fmt::format("{}.{}.{}", filepath, test_id, "strassen_cpu");
-        mat_compare_or_fail(test_name.c_str(), matc_computed_strassen, matc_expected, mata, matb, mat_op::mul);
+            test_name = fmt::format("{}.{}.{}", filepath, test_id, "strassen_cpu");
+            mat_compare_or_fail(test_name.c_str(), matc_computed_strassen, matc_expected, mata, matb, mat_op::mul);
+        }
 
 
         /* Test using opencl kernel */

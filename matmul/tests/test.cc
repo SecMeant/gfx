@@ -251,7 +251,7 @@ static void test_matrix_simple_opencl_mul()
 constexpr static i64 STATUS_LINE_ALIGNMENT = 70;
 constexpr static i64 BENCHMARK_LINE_ALIGNMENT = 48;
 
-void test_matrix_vs_pytorch(const char *safetensors_path);
+void test_matrix_vs_pytorch(const char *safetensors_path, test_flags_t flags);
 void test_threading(bool explicit_exit);
 
 static std::queue<std::string> test_status;
@@ -385,15 +385,39 @@ int run_tests()
         /* SAFETENSORS TESTS */
         {
             .name = "test_matrix_vs_pytorch(pytorch_4x4.safetensors)",
-            .func = std::bind(test_matrix_vs_pytorch, CONFIG_TEST_FILES_PATH "pytorch_4x4.safetensors"),
+            .func = std::bind(test_matrix_vs_pytorch, CONFIG_TEST_FILES_PATH "pytorch_4x4.safetensors",
+                              test_flags_t{}),
         },
         {
             .name = "test_matrix_vs_pytorch(pytorch_64x64.safetensors)",
-            .func = std::bind(test_matrix_vs_pytorch, CONFIG_TEST_FILES_PATH "pytorch_64x64.safetensors"),
+            .func = std::bind(test_matrix_vs_pytorch, CONFIG_TEST_FILES_PATH "pytorch_64x64.safetensors",
+                              test_flags_t{}),
         },
         {
             .name = "test_matrix_vs_pytorch(pytorch_128x128.safetensors)",
-            .func = std::bind(test_matrix_vs_pytorch, CONFIG_TEST_FILES_PATH "pytorch_128x128.safetensors"),
+            .func = std::bind(test_matrix_vs_pytorch, CONFIG_TEST_FILES_PATH "pytorch_128x128.safetensors",
+                              test_flags_t{}),
+        },
+        {
+            .name = "test_matrix_vs_pytorch(pytorch_256x256.safetensors)",
+            .func = std::bind(test_matrix_vs_pytorch, CONFIG_TEST_FILES_PATH "pytorch_256x256.safetensors",
+                              test_flags_t{
+                                  .skip_cpu = 1
+                              }),
+        },
+        {
+            .name = "test_matrix_vs_pytorch(pytorch_512x512.safetensors)",
+            .func = std::bind(test_matrix_vs_pytorch, CONFIG_TEST_FILES_PATH "pytorch_512x512.safetensors",
+                              test_flags_t{
+                                  .skip_cpu = 1
+                              }),
+        },
+        {
+            .name = "test_matrix_vs_pytorch(pytorch_1024x1024.safetensors)",
+            .func = std::bind(test_matrix_vs_pytorch, CONFIG_TEST_FILES_PATH "pytorch_1024x1024.safetensors",
+                              test_flags_t{
+                                  .skip_cpu = 1
+                              }),
         },
     };
 

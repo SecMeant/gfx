@@ -20,6 +20,10 @@ struct test {
     std::function<void()> func;
 };
 
+struct test_flags_t {
+    u32 skip_cpu: 1 = 0;
+};
+
 #define STR_(x) #x
 #define STR(x) STR_(x)
 
