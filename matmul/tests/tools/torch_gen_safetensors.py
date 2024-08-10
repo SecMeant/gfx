@@ -1,15 +1,19 @@
 #!/bin/python3
 import torch
 from safetensors.torch import load_file, save_file
-from sys import argv
+import argparse
 
-if len(argv) <= 1:
-    out_path = 'pytorch_model.safetensors'
-else:
-    out_path = argv[1]
+parser = argparse.ArgumentParser(
+        description = 'Generates random matricies of given dimension and computes the product')
 
-dim = (128, 128)
-val_range = (0, 4096)
+parser.add_argument('-o', '--out', required = True, type = str)
+parser.add_argument('-d', '--dim', required = True, type = int)
+parser.add_argument('-v', '--maxval', required = True, type = int)
+
+args = parser.parse_args()
+
+dim = (args.dim, args.dim)
+val_range = (0, args.maxval)
 dtype = torch.int32
 tensors = {}
 
@@ -22,5 +26,5 @@ for i in range(32):
     tensors[f'B{i}'] = B
     tensors[f'C{i}'] = C
 
-save_file(tensors, out_path)
+save_file(tensors, args.out)
 
