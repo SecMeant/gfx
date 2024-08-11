@@ -202,7 +202,9 @@ void test_matrix_vs_pytorch(const char * const filepath, test_flags_t flags)
 
         constexpr u32 align = 32u;
         std::string test_name;
-        const bool run_on_cpu = !flags.skip_cpu;
+        const bool run_on_cpu = !flags.skip_cpu && false;
+        const bool run_opencl = true;
+        const bool run_cuda = true;
 
         if (tensa.data == nullptr || tensb.data == nullptr || tensc.data == nullptr)
             throw test_failure(fmt::format("Incomplete data for id{}\n", test_id));
@@ -242,30 +244,47 @@ void test_matrix_vs_pytorch(const char * const filepath, test_flags_t flags)
         }
 
 
-        /* Test using opencl kernel */
-        timer.start();
-        mat_t matc_computed_cl = mat_mul_cl(mata, matb);
-        timer.stop();
-        benchinfo.add(fmt::format("{: <{}}mat_mul_cl", filename, align), timer.get_duration());
+        if (run_opencl) {
+            /* Test using opencl kernel */
+            timer.start();
+            mat_t matc_computed_cl = mat_mul_cl(mata, matb);
+            timer.stop();
+            benchinfo.add(fmt::format("{: <{}}mat_mul_cl", filename, align), timer.get_duration());
 
-        TEST_ASSERT(matc_expected.width == matc_computed_cl.width);
-        TEST_ASSERT(matc_expected.height == matc_computed_cl.height);
+            TEST_ASSERT(matc_expected.width == matc_computed_cl.width);
+            TEST_ASSERT(matc_expected.height == matc_computed_cl.height);
 
-        test_name = fmt::format("{}.{}.{}", filepath, test_id, "cl");
-        mat_compare_or_fail(test_name.c_str(), matc_computed_cl, matc_expected, mata, matb, mat_op::mul);
+            test_name = fmt::format("{}.{}.{}", filepath, test_id, "cl");
+            mat_compare_or_fail(test_name.c_str(), matc_computed_cl, matc_expected, mata, matb, mat_op::mul);
+        }
 
 
-        /* Test using cuda kernel */
-        timer.start();
-        mat_t matc_computed_cu = mat_mul_cu(mata, matb);
-        timer.stop();
-        benchinfo.add(fmt::format("{: <{}}mat_mul_cu", filename, align), timer.get_duration());
+        if (run_cuda) {
+            /* Test using cuda kernel */
+            timer.start();
+            mat_t matc_computed_cu = mat_mul_cu(mata, matb);
+            timer.stop();
+            benchinfo.add(fmt::format("{: <{}}mat_mul_cu", filename, align), timer.get_duration());
 
-        TEST_ASSERT(matc_expected.width == matc_computed_cl.width);
-        TEST_ASSERT(matc_expected.height == matc_computed_cl.height);
+            TEST_ASSERT(matc_expected.width == matc_computed_cu.width);
+            TEST_ASSERT(matc_expected.height == matc_computed_cu.height);
 
-        test_name = fmt::format("{}.{}.{}", filepath, test_id, "cu");
-        mat_compare_or_fail(test_name.c_str(), matc_computed_cu, matc_expected, mata, matb, mat_op::mul);
+            test_name = fmt::format("{}.{}.{}", filepath, test_id, "cu");
+            mat_compare_or_fail(test_name.c_str(), matc_computed_cu, matc_expected, mata, matb, mat_op::mul);
+
+
+            /* Test using cuda kernel (tiled) */
+            timer.start();
+            matc_computed_cu = mat_mul_cu_tiled(mata, matb);
+            timer.stop();
+            benchinfo.add(fmt::format("{: <{}}mat_mul_cu_tiled", filename, align), timer.get_duration());
+
+            TEST_ASSERT(matc_expected.width == matc_computed_cu.width);
+            TEST_ASSERT(matc_expected.height == matc_computed_cu.height);
+
+            test_name = fmt::format("{}.{}.{}", filepath, test_id, "cu");
+            mat_compare_or_fail(test_name.c_str(), matc_computed_cu, matc_expected, mata, matb, mat_op::mul);
+        }
     }
 }
 

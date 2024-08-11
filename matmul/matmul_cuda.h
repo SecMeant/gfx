@@ -8,6 +8,11 @@
 #define EXTERN_C
 #endif
 
+enum class cuda_kernel_variant {
+    UMEM,
+    UMEM_TILED,
+};
+
 EXTERN_C int matmul_cu_init(bool verbose);
 
 EXTERN_C int run_kernel_cu(
@@ -24,6 +29,8 @@ EXTERN_C int run_kernel_cu(
     i64 *h_out,
     u32  h_out_cols,
     u32  h_out_rows,
-    u32  h_out_stride
+    u32  h_out_stride,
+
+    cuda_kernel_variant variant
 );
 

@@ -219,4 +219,5 @@ mat_t mat_sub_cl(matview_t lhs, matview_t rhs);
 mat_t mat_mul_cl(matview_t lhs, matview_t rhs);
 
 mat_t mat_mul_cu(matview_t lhs, matview_t rhs);
+mat_t mat_mul_cu_tiled(matview_t lhs, matview_t rhs);
 

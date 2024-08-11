@@ -257,7 +257,7 @@ mat_t mat_mul_cl(matview_t lhs, matview_t rhs)
     return ret;
 }
 
-mat_t mat_mul_cu(matview_t lhs, matview_t rhs)
+static mat_t mat_mul_cu_(matview_t lhs, matview_t rhs, cuda_kernel_variant variant)
 {
     assert(lhs.width == lhs.height);
     assert(rhs.width == rhs.height);
@@ -279,9 +279,20 @@ mat_t mat_mul_cu(matview_t lhs, matview_t rhs)
         out.data.get(),
         out.width,
         out.height,
-        out.stride
+        out.stride,
+
+        variant
     );
 
     return out;
 }
 
+mat_t mat_mul_cu(matview_t lhs, matview_t rhs)
+{
+    return mat_mul_cu_(lhs, rhs, cuda_kernel_variant::UMEM);
+}
+
+mat_t mat_mul_cu_tiled(matview_t lhs, matview_t rhs)
+{
+    return mat_mul_cu_(lhs, rhs, cuda_kernel_variant::UMEM_TILED);
+}
