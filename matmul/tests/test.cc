@@ -419,6 +419,13 @@ int run_tests()
                                   .skip_cpu = 1
                               }),
         },
+        {
+            .name = "test_matrix_vs_pytorch(pytorch_2048x2048.safetensors)",
+            .func = std::bind(test_matrix_vs_pytorch, CONFIG_TEST_FILES_PATH "pytorch_2048x2048.safetensors",
+                              test_flags_t{
+                                  .skip_cpu = 1
+                              }),
+        },
     };
 
     const u32 num_threads = [&] {
