@@ -46,6 +46,7 @@ libmatmul_src = [
     'random.cc',
     'threading.cc',
     'matmul_cuda.cu',
+    'matmul_cuda.cc',
 ]
 
 libmatmul = static_library(
