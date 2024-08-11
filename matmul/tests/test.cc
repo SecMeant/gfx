@@ -249,7 +249,7 @@ static void test_matrix_simple_opencl_mul()
 }
 
 constexpr static i64 STATUS_LINE_ALIGNMENT = 70;
-constexpr static i64 BENCHMARK_LINE_ALIGNMENT = 48;
+constexpr static i64 BENCHMARK_LINE_ALIGNMENT = 52;
 
 void test_matrix_vs_pytorch(const char *safetensors_path, test_flags_t flags);
 void test_threading(bool explicit_exit);
@@ -517,7 +517,7 @@ int main(int argc, char **argv)
         auto binfo = benchinfo.consume_entries();
 
         if (!binfo.empty()) {
-            printf("\nTensor source                   Kernel          Time\n");
+            printf("\nTensor source                   Kernel              Time\n");
         }
 
         for (auto &[line, duration]: binfo) {
