@@ -27,6 +27,11 @@ cpp_args_common = [
   '-DCL_TARGET_OPENCL_VERSION=300',
 ]
 
+cuda_args = [
+  '--dopt=on',
+  '--optimize', '3',
+]
+
 conf.set_quoted('CONFIG_CL_MATMUL_KERNEL_SRC', meson.source_root() / 'matmul.cl')
 
 foreach key : conf.keys()
@@ -48,6 +53,7 @@ libmatmul = static_library(
     libmatmul_src,
     config_header,
     cpp_args: cpp_args_common,
+    cuda_args: cuda_args,
     dependencies: [
         fmt,
         mipc,
