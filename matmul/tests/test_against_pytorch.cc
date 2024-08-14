@@ -190,6 +190,14 @@ void test_matrix_vs_pytorch(const char * const filepath, test_flags_t flags)
     const char * const filename = filename_from_path(filepath);
     timeit_t timer;
 
+    /* For calculating averages. */
+    auto dur_cpu          = timeit_t::Duration::zero();
+    auto dur_strassen_cpu = timeit_t::Duration::zero();
+    auto dur_cl           = timeit_t::Duration::zero();
+    auto dur_cuda         = timeit_t::Duration::zero();
+    auto dur_cuda_tiled   = timeit_t::Duration::zero();
+
+
     /*
      * Convert safetensor file data to internal format.
      * Compute result and compare against the result from file.
@@ -200,7 +208,6 @@ void test_matrix_vs_pytorch(const char * const filepath, test_flags_t flags)
         const auto& tensb   = ttrip.second.b;
         const auto& tensc   = ttrip.second.c;
 
-        constexpr u32 align = 32u;
         std::string test_name;
         const bool run_on_cpu = !flags.skip_cpu && false;
         const bool run_opencl = true;
@@ -221,7 +228,8 @@ void test_matrix_vs_pytorch(const char * const filepath, test_flags_t flags)
             timer.start();
             mat_t matc_computed = mat_mul_cpu(mata, matb);
             timer.stop();
-            benchinfo.add(fmt::format("{: <{}}mat_mul_cpu", filename, align), timer.get_duration());
+
+            dur_cpu += timer.get_duration();
 
             TEST_ASSERT(matc_expected.width == matc_computed.width);
             TEST_ASSERT(matc_expected.height == matc_computed.height);
@@ -234,7 +242,8 @@ void test_matrix_vs_pytorch(const char * const filepath, test_flags_t flags)
             timer.start();
             mat_t matc_computed_strassen = strassen_cpu(mata, matb);
             timer.stop();
-            benchinfo.add(fmt::format("{: <{}}strassen_cpu", filename, align), timer.get_duration());
+
+            dur_strassen_cpu += timer.get_duration();
 
             TEST_ASSERT(matc_expected.width == matc_computed_strassen.width);
             TEST_ASSERT(matc_expected.height == matc_computed_strassen.height);
@@ -249,7 +258,8 @@ void test_matrix_vs_pytorch(const char * const filepath, test_flags_t flags)
             timer.start();
             mat_t matc_computed_cl = mat_mul_cl(mata, matb);
             timer.stop();
-            benchinfo.add(fmt::format("{: <{}}mat_mul_cl", filename, align), timer.get_duration());
+
+            dur_cl += timer.get_duration();
 
             TEST_ASSERT(matc_expected.width == matc_computed_cl.width);
             TEST_ASSERT(matc_expected.height == matc_computed_cl.height);
@@ -264,7 +274,8 @@ void test_matrix_vs_pytorch(const char * const filepath, test_flags_t flags)
             timer.start();
             mat_t matc_computed_cu = mat_mul_cu(mata, matb);
             timer.stop();
-            benchinfo.add(fmt::format("{: <{}}mat_mul_cu", filename, align), timer.get_duration());
+
+            dur_cuda += timer.get_duration();
 
             TEST_ASSERT(matc_expected.width == matc_computed_cu.width);
             TEST_ASSERT(matc_expected.height == matc_computed_cu.height);
@@ -277,7 +288,8 @@ void test_matrix_vs_pytorch(const char * const filepath, test_flags_t flags)
             timer.start();
             matc_computed_cu = mat_mul_cu_tiled(mata, matb);
             timer.stop();
-            benchinfo.add(fmt::format("{: <{}}mat_mul_cu_tiled", filename, align), timer.get_duration());
+
+            dur_cuda_tiled += timer.get_duration();
 
             TEST_ASSERT(matc_expected.width == matc_computed_cu.width);
             TEST_ASSERT(matc_expected.height == matc_computed_cu.height);
@@ -286,5 +298,28 @@ void test_matrix_vs_pytorch(const char * const filepath, test_flags_t flags)
             mat_compare_or_fail(test_name.c_str(), matc_computed_cu, matc_expected, mata, matb, mat_op::mul);
         }
     }
+
+
+    /*
+     * Compute averages
+     */
+
+    const auto num_runs = ttrips.size();
+    constexpr u32 align = 32u;
+
+    if (dur_cpu.count())
+        benchinfo.add(fmt::format("{: <{}}mat_mul_cpu", filename, align), dur_cpu / num_runs);
+
+    if (dur_strassen_cpu.count())
+        benchinfo.add(fmt::format("{: <{}}strassen_cpu", filename, align), dur_strassen_cpu / num_runs);
+
+    if (dur_cl.count())
+        benchinfo.add(fmt::format("{: <{}}mat_mul_cl", filename, align), dur_cl / num_runs);
+
+    if (dur_cuda.count())
+        benchinfo.add(fmt::format("{: <{}}mat_mul_cuda", filename, align), dur_cuda / num_runs);
+
+    if (dur_cuda_tiled.count())
+        benchinfo.add(fmt::format("{: <{}}mat_mul_cuda_tiled", filename, align), dur_cuda_tiled / num_runs);
 }
 
