@@ -209,7 +209,7 @@ void test_matrix_vs_pytorch(const char * const filepath, test_flags_t flags)
         const auto& tensc   = ttrip.second.c;
 
         std::string test_name;
-        const bool run_on_cpu = !flags.skip_cpu && false;
+        const bool run_on_cpu = !flags.skip_cpu;
         const bool run_opencl = true;
         const bool run_cuda = true;
 
