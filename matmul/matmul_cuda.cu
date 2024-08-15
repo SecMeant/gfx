@@ -117,7 +117,7 @@ __global__ void kernel_matmul_tiled_cu(
     const u32  rhs_stride,
     const u32  out_stride
 ) {
-#define TILE_SIZE (32 * 32)
+    constexpr u32 TILE_SIZE = 32 * 32;
 
     __shared__ i64 tilea[TILE_SIZE];
     __shared__ i64 tileb[TILE_SIZE];
