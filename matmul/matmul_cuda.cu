@@ -162,7 +162,6 @@ __global__ void kernel_matmul_tiled_cu(
         __syncthreads();
     }
 
-    __syncthreads();
     out[gx + gy * out_stride] = tilec[tx + ty * tstride];
 }
 
