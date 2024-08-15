@@ -401,9 +401,7 @@ int run_tests()
         {
             .name = "test_matrix_vs_pytorch(pytorch_256x256.safetensors)",
             .func = std::bind(test_matrix_vs_pytorch, CONFIG_TEST_FILES_PATH "pytorch_256x256.safetensors",
-                              test_flags_t{
-                                  .skip_cpu = 1
-                              }),
+                              test_flags_t{}),
         },
         {
             .name = "test_matrix_vs_pytorch(pytorch_512x512.safetensors)",
