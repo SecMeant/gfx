@@ -57,17 +57,22 @@ EXTERN_C int matmul_cu_init(bool verbose)
         if (!verbose)
             continue;
 
-        printf("name: %s\n", devprop.name);
+        printf("name                : %s\n", devprop.name);
         printf("  processor count   : %d\n", devprop.multiProcessorCount);
         printf("  max blocks/proc   : %d\n", devprop.maxBlocksPerMultiProcessor);
         printf("  max threads/block : %d\n", devprop.maxThreadsPerBlock);
         printf("  max threads X     : %d\n", devprop.maxThreadsDim[0]);
         printf("  max threads Y     : %d\n", devprop.maxThreadsDim[1]);
         printf("  max threads Z     : %d\n", devprop.maxThreadsDim[2]);
-        printf("  global memory     : %luMB\n", devprop.totalGlobalMem / (1024UL * 1024UL));
-        printf("  L2                : %d\n", devprop.l2CacheSize);
-        printf("  gpu clock         : %d\n", devprop.clockRate);
-        printf("  mem clock         : %d\n", devprop.memoryClockRate);
+        printf("  max grid X        : %d\n", devprop.maxGridSize[0]);
+        printf("  max grid Y        : %d\n", devprop.maxGridSize[1]);
+        printf("  max grid Z        : %d\n", devprop.maxGridSize[2]);
+        printf("  warp size         : %d\n", devprop.warpSize);
+        printf("  global memory     : %lu MB\n", devprop.totalGlobalMem / (1024UL * 1024UL));
+        printf("  shared memory     : %lu KB\n", devprop.sharedMemPerBlock / 1024UL);
+        printf("  L2                : %d KB\n", devprop.l2CacheSize / 1024);
+        printf("  gpu clock         : %d MHz\n", devprop.clockRate / 1024);
+        printf("  mem clock         : %d MHz\n", devprop.memoryClockRate / 1024);
         printf("  bus width         : %d\n", devprop.memoryBusWidth);
         putchar('\n');
     }
