@@ -308,18 +308,18 @@ void test_matrix_vs_pytorch(const char * const filepath, test_flags_t flags)
     constexpr u32 align = 32u;
 
     if (dur_cpu.count())
-        benchinfo.add(fmt::format("{: <{}}mat_mul_cpu", filename, align), dur_cpu / num_runs);
+        benchinfo.add(fmt::format("{: <{}}cpu", filename, align), dur_cpu / num_runs);
 
     if (dur_strassen_cpu.count())
         benchinfo.add(fmt::format("{: <{}}strassen_cpu", filename, align), dur_strassen_cpu / num_runs);
 
     if (dur_cl.count())
-        benchinfo.add(fmt::format("{: <{}}mat_mul_cl", filename, align), dur_cl / num_runs);
+        benchinfo.add(fmt::format("{: <{}}opencl", filename, align), dur_cl / num_runs);
 
     if (dur_cuda.count())
-        benchinfo.add(fmt::format("{: <{}}mat_mul_cuda", filename, align), dur_cuda / num_runs);
+        benchinfo.add(fmt::format("{: <{}}cuda", filename, align), dur_cuda / num_runs);
 
     if (dur_cuda_tiled.count())
-        benchinfo.add(fmt::format("{: <{}}mat_mul_cuda_tiled", filename, align), dur_cuda_tiled / num_runs);
+        benchinfo.add(fmt::format("{: <{}}cuda_tiled_25k", filename, align), dur_cuda_tiled / num_runs);
 }
 
