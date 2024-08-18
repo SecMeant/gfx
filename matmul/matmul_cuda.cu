@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <assert.h>
 
+#include <atomic>
 #include <vector>
 #include <mutex>
 
@@ -291,14 +292,17 @@ EXTERN_C int run_kernel_cu(
 
     cuda_kernel_variant variant
 ) {
+    static std::atomic<u32> printed(0);
+
     assert(lhs_cols == lhs_rows);
     assert(rhs_cols == rhs_rows);
     assert(out_cols == out_rows);
     assert(lhs_cols == rhs_cols);
     assert(lhs_cols == out_cols);
 
-    if (strcmp(current_dev().name, "NVIDIA GeForce GTX 970")) {
-        fprintf(stderr, "WARN: %s: kernel written for %s, but current device is %s.",
+    if (printed.fetch_or(1, std::memory_order_relaxed) == 0 &&
+        strcmp(current_dev().name, "NVIDIA GeForce GTX 970")) {
+        fprintf(stderr, CLR_YELLOW "WARN: %s: kernel written for %s, but current device is %s.\n" CLR_RESET,
                 __func__, "NVIDIA GeForce GTX 970", current_dev().name);
     }
 
