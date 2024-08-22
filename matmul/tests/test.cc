@@ -523,10 +523,18 @@ int main(int argc, char **argv)
             printf("\nTensor source                   Kernel              Time\n");
         }
 
+        u32 even = 0;
+        const char *clr;
         for (auto &[line, duration]: binfo) {
             append_time_string(line, duration, BENCHMARK_LINE_ALIGNMENT);
-            printf("%s", line.c_str());
+
+            clr = even ? CLR_WHITE : CLR_CYAN;
+            even ^= 1;
+
+            printf("%s%s", clr, line.c_str());
         }
+
+        printf(CLR_RESET);
     }
 
     return ret;
