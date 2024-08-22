@@ -11,6 +11,7 @@
 enum class cuda_kernel_variant {
     UMEM,
     UMEM_TILED,
+    TILED,
     TEST,
 };
 

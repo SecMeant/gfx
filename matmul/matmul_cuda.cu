@@ -302,6 +302,59 @@ static int run_kernel_cu_umem_tiled_(
     return 0;
 }
 
+static int run_kernel_cu_tiled_(
+    const i64 *h_lhs,
+    const i64 *h_rhs,
+          i64 *h_out,
+    const u32  dim,
+    const u32  lhs_stride,
+    const u32  rhs_stride,
+    const u32  out_stride
+) {
+          i64 *d_lhs;
+    const u32  lhs_size = dim * lhs_stride * sizeof(*d_lhs);
+
+          i64 *d_rhs;
+    const u32  rhs_size = dim * rhs_stride * sizeof(*d_rhs);
+
+          i64 *d_out;
+    const u32  out_size = dim * out_stride * sizeof(*d_out);
+
+    checkCudaError(cudaMalloc(&d_lhs, lhs_size));
+    checkCudaError(cudaMalloc(&d_rhs, rhs_size));
+    checkCudaError(cudaMalloc(&d_out, out_size));
+
+    checkCudaError(cudaMemcpy(d_lhs, h_lhs, lhs_size, cudaMemcpyHostToDevice));
+    checkCudaError(cudaMemcpy(d_rhs, h_rhs, rhs_size, cudaMemcpyHostToDevice));
+
+    /* We assume block dim to be 32 */
+    const u32 num_threads = std::min(dim, 32u);
+    const dim3 block_dims(num_threads, num_threads);
+
+    const u32 num_blocks = (dim + num_threads - 1) / num_threads;
+    const dim3 grid_dims(num_blocks, num_blocks);
+
+    kernel_matmul_tiled_cu<<<grid_dims, block_dims>>>(
+        d_lhs,
+        d_rhs,
+        d_out,
+        dim,
+        lhs_stride,
+        rhs_stride,
+        out_stride
+    );
+    cudaDeviceSynchronize();
+
+    checkCudaError(cudaMemcpy(h_out, d_out, out_size, cudaMemcpyDeviceToHost));
+
+    cudaFree(d_out);
+    cudaFree(d_rhs);
+    cudaFree(d_lhs);
+
+    checkCudaError(cudaGetLastError());
+
+    return 0;
+}
 
 static int run_kernel_cu_test_(
     const i64 *h_lhs,
@@ -404,6 +457,17 @@ EXTERN_C int run_kernel_cu(
 
     case cuda_kernel_variant::UMEM_TILED:
         return run_kernel_cu_umem_tiled_(
+            h_lhs,
+            h_rhs,
+            h_out,
+            lhs_cols,
+            lhs_stride,
+            rhs_stride,
+            out_stride
+        );
+
+    case cuda_kernel_variant::TILED:
+        return run_kernel_cu_tiled_(
             h_lhs,
             h_rhs,
             h_out,
