@@ -40,3 +40,8 @@ mat_t mat_mul_cu_tiled(matview_t lhs, matview_t rhs)
 {
     return mat_mul_cu_(lhs, rhs, cuda_kernel_variant::UMEM_TILED);
 }
+
+mat_t mat_mul_cu_test(matview_t lhs, matview_t rhs)
+{
+    return mat_mul_cu_(lhs, rhs, cuda_kernel_variant::TEST);
+}

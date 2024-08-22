@@ -502,6 +502,11 @@ int main(int argc, char **argv)
             opt_num_threads = num_threads;
             continue;
         }
+
+        if (strcmp(s, "--test") == 0) {
+            opt_test = true;
+            continue;
+        }
     }
 
     matmul_cu_init(opt_list_cuda);

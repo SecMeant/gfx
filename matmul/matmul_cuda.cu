@@ -166,6 +166,34 @@ __global__ void kernel_matmul_tiled_cu(
     out[gx + gy * out_stride] = tilec[tx + ty * tstride];
 }
 
+/*
+ * We assume all matrcies are square and have the same dimensions.
+ */
+__global__ void kernel_matmul_test_cu(
+    const i64 *lhs,
+    const i64 *rhs,
+          i64 *out_,
+    const u32  dim,
+    const u32  lhs_stride,
+    const u32  rhs_stride,
+    const u32  out_stride
+) {
+    /* Global coordinates for this thread. */
+    const u32 gx = blockIdx.z + blockIdx.x * blockDim.x;
+    const u32 gy = blockIdx.z + blockIdx.y * blockDim.y;
+
+    const bool out_of_bounds = gx >= dim | gy >= dim;
+    if (out_of_bounds)
+        return;
+
+    u32 out = 0;
+
+    for (u32 i = 0; i < dim; ++i)
+        out += lhs[i + gy * lhs_stride] * rhs[gx + i * rhs_stride];
+
+    out_[gx + gy * out_stride] = out;
+}
+
 static int run_kernel_cu_umem_(
     const i64 *h_lhs,
     const i64 *h_rhs,
@@ -274,6 +302,60 @@ static int run_kernel_cu_umem_tiled_(
     return 0;
 }
 
+
+static int run_kernel_cu_test_(
+    const i64 *h_lhs,
+    const i64 *h_rhs,
+          i64 *h_out,
+    const u32  dim,
+    const u32  lhs_stride,
+    const u32  rhs_stride,
+    const u32  out_stride
+) {
+          i64 *u_lhs;
+    const u32  lhs_size = dim * lhs_stride * sizeof(*u_lhs);
+
+          i64 *u_rhs;
+    const u32  rhs_size = dim * rhs_stride * sizeof(*u_rhs);
+
+          i64 *u_out;
+    const u32  out_size = dim * out_stride * sizeof(*u_out);
+
+    checkCudaError(cudaMallocManaged(&u_lhs, lhs_size));
+    checkCudaError(cudaMallocManaged(&u_rhs, rhs_size));
+    checkCudaError(cudaMallocManaged(&u_out, out_size));
+
+    memcpy(u_lhs, h_lhs, lhs_size);
+    memcpy(u_rhs, h_rhs, rhs_size);
+
+    const u32 num_threads = 32;
+    const dim3 block_dims(num_threads, num_threads);
+
+    const u32 num_blocks = (dim + num_threads - 1) / num_threads;
+    const dim3 grid_dims(num_blocks, num_blocks);
+
+    kernel_matmul_cu<<<grid_dims, block_dims>>>(
+        u_lhs,
+        u_rhs,
+        u_out,
+        dim,
+        lhs_stride,
+        rhs_stride,
+        out_stride
+    );
+    cudaDeviceSynchronize();
+
+    memcpy(h_out, u_out, out_size);
+
+    cudaFree(u_out);
+    cudaFree(u_rhs);
+    cudaFree(u_lhs);
+
+    checkCudaError(cudaGetLastError());
+
+    return 0;
+}
+
 EXTERN_C int run_kernel_cu(
           i64 *h_lhs,
     const u32  lhs_cols,
@@ -322,6 +404,17 @@ EXTERN_C int run_kernel_cu(
 
     case cuda_kernel_variant::UMEM_TILED:
         return run_kernel_cu_umem_tiled_(
+            h_lhs,
+            h_rhs,
+            h_out,
+            lhs_cols,
+            lhs_stride,
+            rhs_stride,
+            out_stride
+        );
+
+    case cuda_kernel_variant::TEST:
+        return run_kernel_cu_test_(
             h_lhs,
             h_rhs,
             h_out,

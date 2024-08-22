@@ -17,6 +17,7 @@
 #include "print_utils.h"
 #include "timing.h"
 #include "bench.h"
+#include "options.h"
 
 struct safetensor_i32 {
     // Shape
@@ -196,6 +197,7 @@ void test_matrix_vs_pytorch(const char * const filepath, test_flags_t flags)
     auto dur_cl           = timeit_t::Duration::zero();
     auto dur_cuda         = timeit_t::Duration::zero();
     auto dur_cuda_tiled   = timeit_t::Duration::zero();
+    auto dur_cuda_test    = timeit_t::Duration::zero();
 
 
     /*
@@ -296,6 +298,22 @@ void test_matrix_vs_pytorch(const char * const filepath, test_flags_t flags)
 
             test_name = fmt::format("{}.{}.{}", filepath, test_id, "cu");
             mat_compare_or_fail(test_name.c_str(), matc_computed_cu, matc_expected, mata, matb, mat_op::mul);
+
+
+            if (opt_test) {
+                /* Test using cuda kernel (test) */
+                timer.start();
+                matc_computed_cu = mat_mul_cu_test(mata, matb);
+                timer.stop();
+
+                dur_cuda_test += timer.get_duration();
+
+                TEST_ASSERT(matc_expected.width == matc_computed_cu.width);
+                TEST_ASSERT(matc_expected.height == matc_computed_cu.height);
+
+                test_name = fmt::format("{}.{}.{}", filepath, test_id, "cu");
+                mat_compare_or_fail(test_name.c_str(), matc_computed_cu, matc_expected, mata, matb, mat_op::mul);
+            }
         }
     }
 
@@ -321,5 +339,8 @@ void test_matrix_vs_pytorch(const char * const filepath, test_flags_t flags)
 
     if (dur_cuda_tiled.count())
         benchinfo.add(fmt::format("{: <{}}cuda_tiled_25k", filename, align), dur_cuda_tiled / num_runs);
+
+    if (dur_cuda_test.count())
+        benchinfo.add(fmt::format("{: <{}}cuda_test_25k", filename, align), dur_cuda_test / num_runs);
 }
 
