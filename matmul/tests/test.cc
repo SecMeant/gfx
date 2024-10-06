@@ -484,7 +484,12 @@ int main(int argc, char **argv)
 
         if (strcmp(s, "-h") == 0 || strcmp(s, "--help") == 0) {
             printf("Usage: %s OPTIONS\n", argv[0]);
-            printf("  -lc, --list-cuda    List available cuda devices\n");
+            printf(
+                "  -lc, --list-cuda    List available cuda devices\n"
+                "       --bench        Print detailed branchmarking/timing information\n"
+                "  -n,  --threads      Number of threads to run in parallel when running benchmarks\n"
+                "       --test         Test cuda kernels\n"
+            );
             return 0;
         }
 
