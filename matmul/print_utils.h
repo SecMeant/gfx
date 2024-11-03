@@ -4,7 +4,7 @@
 
 #include <stdio.h>
 
-inline void print_mat(matview_t mv)
+inline void print_mat(matview_i64_t mv)
 {
     for (u32 y = 0; y < mv.height; ++y) {
 

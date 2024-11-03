@@ -61,10 +61,10 @@ enum mat_op {
  */
 void mat_compare_or_fail(
     const char *test_name,
-    matview_t actual,
-    matview_t expected,
-    matview_t lhs = matview_t(),
-    matview_t rhs = matview_t(),
+    matview_i64_t actual,
+    matview_i64_t expected,
+    matview_i64_t lhs = matview_i64_t(),
+    matview_i64_t rhs = matview_i64_t(),
     mat_op op = mat_op::none
 );
 

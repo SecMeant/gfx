@@ -1,13 +1,13 @@
 #include "matmul_cuda.h"
 #include "mat.h"
 
-static mat_t mat_mul_cu_(matview_t lhs, matview_t rhs, cuda_kernel_variant variant)
+static mat_i64_t mat_mul_cu_(matview_i64_t lhs, matview_i64_t rhs, cuda_kernel_variant variant)
 {
     assert(lhs.width == lhs.height);
     assert(rhs.width == rhs.height);
     assert(lhs.width == rhs.width);
 
-    mat_t out = mat_t::make_matrix(lhs.width, lhs.height);
+    mat_i64_t out = mat_i64_t::make_matrix(lhs.width, lhs.height);
 
     run_kernel_cu(
         lhs.data,
@@ -31,22 +31,22 @@ static mat_t mat_mul_cu_(matview_t lhs, matview_t rhs, cuda_kernel_variant varia
     return out;
 }
 
-mat_t mat_mul_cu(matview_t lhs, matview_t rhs)
+mat_i64_t mat_mul_cu(matview_i64_t lhs, matview_i64_t rhs)
 {
     return mat_mul_cu_(lhs, rhs, cuda_kernel_variant::UMEM);
 }
 
-mat_t mat_mul_cu_umem_tiled(matview_t lhs, matview_t rhs)
+mat_i64_t mat_mul_cu_umem_tiled(matview_i64_t lhs, matview_i64_t rhs)
 {
     return mat_mul_cu_(lhs, rhs, cuda_kernel_variant::UMEM_TILED);
 }
 
-mat_t mat_mul_cu_tiled(matview_t lhs, matview_t rhs)
+mat_i64_t mat_mul_cu_tiled(matview_i64_t lhs, matview_i64_t rhs)
 {
     return mat_mul_cu_(lhs, rhs, cuda_kernel_variant::TILED);
 }
 
-mat_t mat_mul_cu_test(matview_t lhs, matview_t rhs)
+mat_i64_t mat_mul_cu_test(matview_i64_t lhs, matview_i64_t rhs)
 {
     return mat_mul_cu_(lhs, rhs, cuda_kernel_variant::TEST);
 }

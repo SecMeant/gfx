@@ -12,7 +12,7 @@ int main(int argc, char **argv)
 {
     parse_args(argc, argv);
 
-    auto m = mat_t::make_matrix(3, 4);
+    auto m = mat_i64_t::make_matrix(3, 4);
 
     print_mat(m);
 

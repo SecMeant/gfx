@@ -114,12 +114,12 @@ static int init_kernel_context()
 }
 
 
-static int run_kernel(matview_t lhs, matview_t rhs, mat_t &out_)
+static int run_kernel(matview_i64_t lhs, matview_i64_t rhs, mat_i64_t &out_)
 {
     int err;
 
     /* Actual work */
-    mat_t out = mat_t::make_matrix_zero(lhs.height, rhs.width);
+    mat_i64_t out = mat_i64_t::make_matrix_zero(lhs.height, rhs.width);
     cl_command_queue queue;
     cl_kernel kernel;
     cl_mem cl_out_buffer;
@@ -237,19 +237,19 @@ static int run_kernel(matview_t lhs, matview_t rhs, mat_t &out_)
     return 0;
 }
 
-mat_t mat_add_cl(matview_t lhs, matview_t rhs)
+mat_i64_t mat_add_cl(matview_i64_t lhs, matview_i64_t rhs)
 {
-    return mat_t();
+    return mat_i64_t();
 }
 
-mat_t mat_sub_cl(matview_t lhs, matview_t rhs)
+mat_i64_t mat_sub_cl(matview_i64_t lhs, matview_i64_t rhs)
 {
-    return mat_t();
+    return mat_i64_t();
 }
 
-mat_t mat_mul_cl(matview_t lhs, matview_t rhs)
+mat_i64_t mat_mul_cl(matview_i64_t lhs, matview_i64_t rhs)
 {
-    mat_t ret;
+    mat_i64_t ret;
 
     run_kernel(lhs, rhs, ret);
 

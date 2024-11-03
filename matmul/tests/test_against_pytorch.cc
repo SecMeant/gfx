@@ -33,9 +33,9 @@ struct test_tripplet {
     safetensor_i32 c;
 };
 
-static mat_t make_mat_from_tensor_data(const safetensor_i32 &tensor)
+static mat_i64_t make_mat_from_tensor_data(const safetensor_i32 &tensor)
 {
-    return mat_t::make_matrix_from_data(tensor.data, tensor.cols, tensor.rows);
+    return mat_i64_t::make_matrix_from_data(tensor.data, tensor.cols, tensor.rows);
 }
 
 static const char* filename_from_path(std::string_view filepath)
@@ -221,15 +221,15 @@ void test_matrix_vs_pytorch(const char * const filepath, test_flags_t flags)
 
 
         /* Prepare data from pytorch */
-        mat_t mata = make_mat_from_tensor_data(tensa);
-        mat_t matb = make_mat_from_tensor_data(tensb);
-        mat_t matc_expected = make_mat_from_tensor_data(tensc);
+        mat_i64_t mata = make_mat_from_tensor_data(tensa);
+        mat_i64_t matb = make_mat_from_tensor_data(tensb);
+        mat_i64_t matc_expected = make_mat_from_tensor_data(tensc);
 
 
         if (run_on_cpu) {
             /* Test using mat_mul_cpu() */
             timer.start();
-            mat_t matc_computed = mat_mul_cpu(mata, matb);
+            mat_i64_t matc_computed = mat_mul_cpu(mata, matb);
             timer.stop();
 
             dur_cpu += timer.get_duration();
@@ -243,7 +243,7 @@ void test_matrix_vs_pytorch(const char * const filepath, test_flags_t flags)
 
             /* Test using strassen_cpu() */
             timer.start();
-            mat_t matc_computed_strassen = strassen_cpu(mata, matb);
+            mat_i64_t matc_computed_strassen = strassen_cpu(mata, matb);
             timer.stop();
 
             dur_strassen_cpu += timer.get_duration();
@@ -259,7 +259,7 @@ void test_matrix_vs_pytorch(const char * const filepath, test_flags_t flags)
         if (run_opencl) {
             /* Test using opencl kernel */
             timer.start();
-            mat_t matc_computed_cl = mat_mul_cl(mata, matb);
+            mat_i64_t matc_computed_cl = mat_mul_cl(mata, matb);
             timer.stop();
 
             dur_cl += timer.get_duration();
@@ -275,7 +275,7 @@ void test_matrix_vs_pytorch(const char * const filepath, test_flags_t flags)
         if (run_cuda) {
             /* Test using cuda kernel */
             timer.start();
-            mat_t matc_computed_cu = mat_mul_cu(mata, matb);
+            mat_i64_t matc_computed_cu = mat_mul_cu(mata, matb);
             timer.stop();
 
             dur_cuda += timer.get_duration();

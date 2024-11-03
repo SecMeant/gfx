@@ -8,23 +8,23 @@
 #include <algorithm>
 #include <vector>
 
-struct mat_t {
+struct mat_i64_t {
     using ValueType = i64;
     using ValueRef = ValueType&;
     using ValueCRef = const ValueType&;
     using ValueCPtr = const ValueType*;
     using InitializerType = std::vector<std::vector<ValueType>>;
 
-    mat_t() = default;
+    mat_i64_t() = default;
 
-    mat_t(mat_t &&other)
+    mat_i64_t(mat_i64_t &&other)
     :data(std::move(other.data))
     ,width(other.width)
     ,height(other.height)
     ,stride(other.stride)
     { }
 
-    mat_t& operator=(mat_t &&other)
+    mat_i64_t& operator=(mat_i64_t &&other)
     {
         this->data = std::move(other.data);
         this->width = other.width;
@@ -34,7 +34,7 @@ struct mat_t {
         return *this;
     }
 
-    mat_t(const InitializerType& init)
+    mat_i64_t(const InitializerType& init)
     {
         const auto height = init.size();
         const auto width = height == 0 ? 0 : init[0].size();
@@ -46,14 +46,14 @@ struct mat_t {
                 this->at(x,y) = init[y][x];
     }
 
-    static mat_t make_matrix(const u32 width, const u32 height, u32 stride = 0)
+    static mat_i64_t make_matrix(const u32 width, const u32 height, u32 stride = 0)
     {
         if (stride == 0)
             stride = gen_stride(width);
 
         assert(stride >= width);
 
-        mat_t ret;
+        mat_i64_t ret;
 
         ret.data = std::make_unique<ValueType[]>(stride * height);
         ret.width = width;
@@ -63,10 +63,10 @@ struct mat_t {
         return ret;
     }
 
-    static mat_t make_matrix_from_data(const i32 *data, const u32 width, const u32 height, u32 stride = 0)
+    static mat_i64_t make_matrix_from_data(const i32 *data, const u32 width, const u32 height, u32 stride = 0)
     {
         /* TODO: We don't always have to reallocate */
-        mat_t ret = make_matrix(width, height, stride);
+        mat_i64_t ret = make_matrix(width, height, stride);
 
         auto src_row = data;
         auto dst_row = ret.data.get();
@@ -84,24 +84,24 @@ struct mat_t {
         return (width + 15UL) & (~15UL);
     }
 
-    static mat_t make_matrix_zero(const u32 width, const u32 height, u32 stride = 0)
+    static mat_i64_t make_matrix_zero(const u32 width, const u32 height, u32 stride = 0)
     {
         if (stride == 0)
             stride = gen_stride(width);
 
-        mat_t ret = make_matrix(width, height, stride);
+        mat_i64_t ret = make_matrix(width, height, stride);
 
         ret.set_zero();
 
         return ret;
     }
 
-    static mat_t make_matrix_random(const u32 width, const u32 height, u32 stride = 0)
+    static mat_i64_t make_matrix_random(const u32 width, const u32 height, u32 stride = 0)
     {
         if (stride == 0)
             stride = gen_stride(width);
 
-        mat_t ret = make_matrix(width, height, stride);
+        mat_i64_t ret = make_matrix(width, height, stride);
 
         ret.set_random();
 
@@ -156,32 +156,32 @@ struct mat_t {
     u32 stride;
 };
 
-struct matview_t {
-    using ValueType = mat_t::ValueType;
+struct matview_i64_t {
+    using ValueType = mat_i64_t::ValueType;
     using ValueRef = ValueType&;
     using ValueCRef = const ValueType&;
     using ValuePtr = ValueType*;
 
-    constexpr matview_t()
+    constexpr matview_i64_t()
     : data(nullptr)
     , width(0)
     , height(0)
     , stride(0)
     {}
 
-    matview_t(const matview_t &other) = default;
-    matview_t(matview_t &&other) = default;
-    matview_t& operator=(const matview_t &other) = default;
-    matview_t& operator=(matview_t &&other) = default;
+    matview_i64_t(const matview_i64_t &other) = default;
+    matview_i64_t(matview_i64_t &&other) = default;
+    matview_i64_t& operator=(const matview_i64_t &other) = default;
+    matview_i64_t& operator=(matview_i64_t &&other) = default;
 
-    matview_t(const mat_t &m)
+    matview_i64_t(const mat_i64_t &m)
     :data(m.data.get())
     ,width(m.width)
     ,height(m.height)
     ,stride(m.stride)
     {}
 
-    matview_t(ValuePtr data, u32 width, u32 height, u32 stride)
+    matview_i64_t(ValuePtr data, u32 width, u32 height, u32 stride)
     :data(data)
     ,width(width)
     ,height(height)
@@ -226,24 +226,24 @@ struct matview_t {
     u32 stride;
 };
 
-constexpr bool mat_dim_match(matview_t m0, matview_t m1)
+constexpr bool mat_dim_match(matview_i64_t m0, matview_i64_t m1)
 {
     return m0.width == m1.width && m0.height == m1.height;
 }
 
-mat_t mat_add_cpu(matview_t lhs, matview_t rhs);
-mat_t mat_sub_cpu(matview_t lhs, matview_t rhs);
-mat_t mat_mul_cpu(matview_t lhs, matview_t rhs);
-void mat_copy(matview_t dst, matview_t src);
+mat_i64_t mat_add_cpu(matview_i64_t lhs, matview_i64_t rhs);
+mat_i64_t mat_sub_cpu(matview_i64_t lhs, matview_i64_t rhs);
+mat_i64_t mat_mul_cpu(matview_i64_t lhs, matview_i64_t rhs);
+void mat_copy(matview_i64_t dst, matview_i64_t src);
 
-mat_t strassen_cpu(matview_t lhs, matview_t rhs);
+mat_i64_t strassen_cpu(matview_i64_t lhs, matview_i64_t rhs);
 
-mat_t mat_add_cl(matview_t lhs, matview_t rhs);
-mat_t mat_sub_cl(matview_t lhs, matview_t rhs);
-mat_t mat_mul_cl(matview_t lhs, matview_t rhs);
+mat_i64_t mat_add_cl(matview_i64_t lhs, matview_i64_t rhs);
+mat_i64_t mat_sub_cl(matview_i64_t lhs, matview_i64_t rhs);
+mat_i64_t mat_mul_cl(matview_i64_t lhs, matview_i64_t rhs);
 
-mat_t mat_mul_cu(matview_t lhs, matview_t rhs);
-mat_t mat_mul_cu_umem_tiled(matview_t lhs, matview_t rhs);
-mat_t mat_mul_cu_tiled(matview_t lhs, matview_t rhs);
-mat_t mat_mul_cu_test(matview_t lhs, matview_t rhs);
+mat_i64_t mat_mul_cu(matview_i64_t lhs, matview_i64_t rhs);
+mat_i64_t mat_mul_cu_umem_tiled(matview_i64_t lhs, matview_i64_t rhs);
+mat_i64_t mat_mul_cu_tiled(matview_i64_t lhs, matview_i64_t rhs);
+mat_i64_t mat_mul_cu_test(matview_i64_t lhs, matview_i64_t rhs);
 

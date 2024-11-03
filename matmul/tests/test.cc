@@ -22,10 +22,10 @@ constexpr bool VERBOSE = true;
 static void print_mat_mul_context_(
     const u32 x,
     const u32 y,
-    const matview_t actual,
-    const matview_t expected,
-    const matview_t lhs,
-    const matview_t rhs
+    const matview_i64_t actual,
+    const matview_i64_t expected,
+    const matview_i64_t lhs,
+    const matview_i64_t rhs
 ) {
     assert(lhs.height == rhs.width);
     assert(lhs.height != 0);
@@ -48,10 +48,10 @@ static void print_mat_mul_context_(
 
 /* Returns number of mismatching elements capped by max_num_miscmp. */
 static int mat_compare_(
-    const matview_t actual,
-    const matview_t expected,
-    const matview_t lhs,
-    const matview_t rhs,
+    const matview_i64_t actual,
+    const matview_i64_t expected,
+    const matview_i64_t lhs,
+    const matview_i64_t rhs,
     const mat_op op
 ) {
     constexpr u32 max_num_miscmp = 4;
@@ -92,10 +92,10 @@ static int mat_compare_(
 
 void mat_compare_or_fail(
     const char *test_name,
-    const matview_t actual,
-    const matview_t expected,
-    const matview_t lhs,
-    const matview_t rhs,
+    const matview_i64_t actual,
+    const matview_i64_t expected,
+    const matview_i64_t lhs,
+    const matview_i64_t rhs,
     const mat_op op
 ) {
     const int failed = mat_compare_(actual, expected, lhs, rhs, op);
@@ -106,7 +106,7 @@ void mat_compare_or_fail(
 
 static void test_matrix_simple_add()
 {
-    using init_t = mat_t::InitializerType;
+    using init_t = mat_i64_t::InitializerType;
 
     const init_t lhs_data = {
         {1,  2,  3,  4 },
@@ -126,8 +126,8 @@ static void test_matrix_simple_add()
         {33, 24, 27, 28},
     };
 
-    const auto lhs = mat_t(lhs_data);
-    const auto rhs = mat_t(rhs_data);
+    const auto lhs = mat_i64_t(lhs_data);
+    const auto rhs = mat_i64_t(rhs_data);
 
     const auto out = mat_add_cpu(lhs, rhs);
 
@@ -141,7 +141,7 @@ static void test_matrix_simple_add()
 
 static void test_matrix_simple_mul()
 {
-    using init_t = mat_t::InitializerType;
+    using init_t = mat_i64_t::InitializerType;
 
     const init_t lhs_data = {
         {1,  2,  3,  4 },
@@ -164,8 +164,8 @@ static void test_matrix_simple_mul()
         {9498, 614, 1967, 881}
     };
 
-    const auto lhs = mat_t(lhs_data);
-    const auto rhs = mat_t(rhs_data);
+    const auto lhs = mat_i64_t(lhs_data);
+    const auto rhs = mat_i64_t(rhs_data);
 
     const auto out = mat_mul_cpu(lhs, rhs);
 
@@ -176,7 +176,7 @@ static void test_matrix_simple_mul()
 
 static void test_matrix_simple_strassen_mul()
 {
-    using init_t = mat_t::InitializerType;
+    using init_t = mat_i64_t::InitializerType;
 
     const init_t lhs_data = {
         {1,  2,  3,  4 , 1,  2,  3,  4 },
@@ -200,8 +200,8 @@ static void test_matrix_simple_strassen_mul()
         {4,  3, 1,  9, 4,  3, 1,  9},
     };
 
-    const auto lhs = mat_t(lhs_data);
-    const auto rhs = mat_t(rhs_data);
+    const auto lhs = mat_i64_t(lhs_data);
+    const auto rhs = mat_i64_t(rhs_data);
 
     const auto out0 = strassen_cpu(lhs, rhs);
     const auto out1 = mat_mul_cpu(lhs, rhs);
@@ -213,7 +213,7 @@ static void test_matrix_simple_strassen_mul()
 
 static void test_matrix_simple_opencl_mul()
 {
-    using init_t = mat_t::InitializerType;
+    using init_t = mat_i64_t::InitializerType;
 
     const init_t lhs_data = {
         {1,  2,  3,  4 , 1,  2,  3,  4 },
@@ -237,8 +237,8 @@ static void test_matrix_simple_opencl_mul()
         {4,  3, 1,  9, 4,  3, 1,  9},
     };
 
-    const auto lhs = mat_t(lhs_data);
-    const auto rhs = mat_t(rhs_data);
+    const auto lhs = mat_i64_t(lhs_data);
+    const auto rhs = mat_i64_t(rhs_data);
 
     const auto out0 = mat_mul_cl(lhs, rhs);
     const auto out1 = mat_mul_cpu(lhs, rhs);
