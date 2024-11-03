@@ -8,23 +8,24 @@
 #include <algorithm>
 #include <vector>
 
-struct mat_i64_t {
-    using ValueType = i64;
+template<typename ValueType_>
+struct mat_base_t {
+    using ValueType = ValueType_;
     using ValueRef = ValueType&;
     using ValueCRef = const ValueType&;
     using ValueCPtr = const ValueType*;
     using InitializerType = std::vector<std::vector<ValueType>>;
 
-    mat_i64_t() = default;
+    mat_base_t() = default;
 
-    mat_i64_t(mat_i64_t &&other)
+    mat_base_t(mat_base_t &&other)
     :data(std::move(other.data))
     ,width(other.width)
     ,height(other.height)
     ,stride(other.stride)
     { }
 
-    mat_i64_t& operator=(mat_i64_t &&other)
+    mat_base_t& operator=(mat_base_t &&other)
     {
         this->data = std::move(other.data);
         this->width = other.width;
@@ -34,7 +35,7 @@ struct mat_i64_t {
         return *this;
     }
 
-    mat_i64_t(const InitializerType& init)
+    mat_base_t(const InitializerType& init)
     {
         const auto height = init.size();
         const auto width = height == 0 ? 0 : init[0].size();
@@ -46,14 +47,14 @@ struct mat_i64_t {
                 this->at(x,y) = init[y][x];
     }
 
-    static mat_i64_t make_matrix(const u32 width, const u32 height, u32 stride = 0)
+    static mat_base_t make_matrix(const u32 width, const u32 height, u32 stride = 0)
     {
         if (stride == 0)
             stride = gen_stride(width);
 
         assert(stride >= width);
 
-        mat_i64_t ret;
+        mat_base_t ret;
 
         ret.data = std::make_unique<ValueType[]>(stride * height);
         ret.width = width;
@@ -63,10 +64,10 @@ struct mat_i64_t {
         return ret;
     }
 
-    static mat_i64_t make_matrix_from_data(const i32 *data, const u32 width, const u32 height, u32 stride = 0)
+    static mat_base_t make_matrix_from_data(const i32 *data, const u32 width, const u32 height, u32 stride = 0)
     {
         /* TODO: We don't always have to reallocate */
-        mat_i64_t ret = make_matrix(width, height, stride);
+        mat_base_t ret = make_matrix(width, height, stride);
 
         auto src_row = data;
         auto dst_row = ret.data.get();
@@ -84,24 +85,24 @@ struct mat_i64_t {
         return (width + 15UL) & (~15UL);
     }
 
-    static mat_i64_t make_matrix_zero(const u32 width, const u32 height, u32 stride = 0)
+    static mat_base_t make_matrix_zero(const u32 width, const u32 height, u32 stride = 0)
     {
         if (stride == 0)
             stride = gen_stride(width);
 
-        mat_i64_t ret = make_matrix(width, height, stride);
+        mat_base_t ret = make_matrix(width, height, stride);
 
         ret.set_zero();
 
         return ret;
     }
 
-    static mat_i64_t make_matrix_random(const u32 width, const u32 height, u32 stride = 0)
+    static mat_base_t make_matrix_random(const u32 width, const u32 height, u32 stride = 0)
     {
         if (stride == 0)
             stride = gen_stride(width);
 
-        mat_i64_t ret = make_matrix(width, height, stride);
+        mat_base_t ret = make_matrix(width, height, stride);
 
         ret.set_random();
 
@@ -156,32 +157,35 @@ struct mat_i64_t {
     u32 stride;
 };
 
-struct matview_i64_t {
-    using ValueType = mat_i64_t::ValueType;
+using mat_i64_t = mat_base_t<i64>;
+
+template<typename ParentType>
+struct matview_base_t {
+    using ValueType = typename ParentType::ValueType;
     using ValueRef = ValueType&;
     using ValueCRef = const ValueType&;
     using ValuePtr = ValueType*;
 
-    constexpr matview_i64_t()
+    constexpr matview_base_t()
     : data(nullptr)
     , width(0)
     , height(0)
     , stride(0)
     {}
 
-    matview_i64_t(const matview_i64_t &other) = default;
-    matview_i64_t(matview_i64_t &&other) = default;
-    matview_i64_t& operator=(const matview_i64_t &other) = default;
-    matview_i64_t& operator=(matview_i64_t &&other) = default;
+    matview_base_t(const matview_base_t &other) = default;
+    matview_base_t(matview_base_t &&other) = default;
+    matview_base_t& operator=(const matview_base_t &other) = default;
+    matview_base_t& operator=(matview_base_t &&other) = default;
 
-    matview_i64_t(const mat_i64_t &m)
+    matview_base_t(const ParentType &m)
     :data(m.data.get())
     ,width(m.width)
     ,height(m.height)
     ,stride(m.stride)
     {}
 
-    matview_i64_t(ValuePtr data, u32 width, u32 height, u32 stride)
+    matview_base_t(ValuePtr data, u32 width, u32 height, u32 stride)
     :data(data)
     ,width(width)
     ,height(height)
@@ -225,6 +229,8 @@ struct matview_i64_t {
     u32 height;
     u32 stride;
 };
+
+using matview_i64_t = matview_base_t<mat_i64_t>;
 
 constexpr bool mat_dim_match(matview_i64_t m0, matview_i64_t m1)
 {
