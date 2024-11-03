@@ -19,23 +19,49 @@
 #include "bench.h"
 #include "options.h"
 
-struct safetensor_i32 {
+struct safetensor {
+    enum class dtype {
+        none,
+        i32,
+        f32,
+    };
+
     // Shape
     u32 rows = 0;
     u32 cols = 0;
 
-    const i32* data = nullptr;
+    dtype type = dtype::none;
+
+    const void* data = nullptr;
 };
+
+constexpr static const char* dtype2str(safetensor::dtype t)
+{
+    using dtype = safetensor::dtype;
+
+    switch(t) {
+    case dtype::none:
+        return "none";
+    case dtype::i32:
+        return "i32";
+    case dtype::f32:
+        return "f32";
+    }
+
+    __builtin_unreachable();
+
+    return "none";
+}
 
 struct test_tripplet {
-    safetensor_i32 a;
-    safetensor_i32 b;
-    safetensor_i32 c;
+    safetensor a;
+    safetensor b;
+    safetensor c;
 };
 
-static mat_i64_t make_mat_from_tensor_data(const safetensor_i32 &tensor)
+static mat_i64_t make_mat_i32_from_tensor_data(const safetensor &tensor)
 {
-    return mat_i64_t::make_matrix_from_data(tensor.data, tensor.cols, tensor.rows);
+    return mat_i64_t::make_matrix_from_data(reinterpret_cast<const i32*>(tensor.data), tensor.cols, tensor.rows);
 }
 
 static const char* filename_from_path(std::string_view filepath)
@@ -47,12 +73,8 @@ static const char* filename_from_path(std::string_view filepath)
     return &filepath[pos+1];
 }
 
-void test_matrix_vs_pytorch(const char * const filepath, test_flags_t flags)
+static int parse_safetensors(mipc::finbuf &ftensors, std::map<u64, test_tripplet> &ttrips)
 {
-    auto ftensors = mipc::finbuf(filepath);
-    if (!ftensors)
-        throw test_failure("Failed to open safetensors file\n");
-
     const char *begin = ftensors.begin();
 
     u64 metadata_size = 0;
@@ -66,8 +88,6 @@ void test_matrix_vs_pytorch(const char * const filepath, test_flags_t flags)
 
     rapidjson::Document header_json;
     header_json.Parse(header_str.c_str());
-
-    std::map<u64, test_tripplet> ttrips;
 
     assert(header_json.IsObject());
     for (auto &m: header_json.GetObject()) {
@@ -87,26 +107,35 @@ void test_matrix_vs_pytorch(const char * const filepath, test_flags_t flags)
          * },
          */
 
-        auto parse_tensor_data = [&] (safetensor_i32 &t) {
+        auto parse_tensor_data = [&] (safetensor &t) {
 
             /*
              * Parse dtype
              */
             if (!m.value.HasMember("dtype")) {
                 fmt::print(stderr, "{}: Missing {} field\n", m.name.GetString(), "dtype");
-                return;
+                return 1;
             }
 
             if (!m.value["dtype"].IsString()) {
                 fmt::print(stderr, "{}: Expected {} field to be of type {}\n",
                        m.name.GetString(), "dtype", "string");
-                return;
+                return 1;
             }
 
-            if (strcmp(m.value["dtype"].GetString(), "I32") != 0) {
-                fmt::print(stderr, "{}: Expected {} field to be \"I32\", but got {}\n",
+            t.type = safetensor::dtype::none;
+            const char * const typestr = m.value["dtype"].GetString();
+
+            if (strcmp(typestr, "I32") == 0)
+                t.type = safetensor::dtype::i32;
+
+            if (strcmp(typestr, "F32") == 0)
+                t.type = safetensor::dtype::f32;
+
+            if (t.type == safetensor::dtype::none) {
+                fmt::print(stderr, "{}: Expected {} field to be \"I32\" or \"F32\", but got {}\n",
                        m.name.GetString(), "dtype", m.value.GetString());
-                return;
+                return 1;
             }
 
 
@@ -115,19 +144,19 @@ void test_matrix_vs_pytorch(const char * const filepath, test_flags_t flags)
              */
             if (!m.value.HasMember("shape")) {
                 fmt::print(stderr, "{}: Missing {} field\n", m.name.GetString(), "shape");
-                return;
+                return 1;
             }
 
             if (!m.value["shape"].IsArray()) {
                 fmt::print(stderr, "{}: Expected {} field to be of type {}\n",
                        m.name.GetString(), "shape", "array");
-                return;
+                return 1;
             }
 
             if (m.value["shape"].GetArray().Size() != 2) {
                 fmt::print(stderr, "{}: Expected shape to be array of size 2\n",
                        m.name.GetString());
-                return;
+                return 1;
             }
 
             t.rows = m.value["shape"].GetArray()[0].GetUint();
@@ -139,22 +168,22 @@ void test_matrix_vs_pytorch(const char * const filepath, test_flags_t flags)
              */
             if (!m.value.HasMember("data_offsets")) {
                 fmt::print(stderr, "{}: Missing {} field\n", m.name.GetString(), "data_offsets");
-                return;
+                return 1;
             }
 
             if (!m.value["data_offsets"].IsArray()) {
                 fmt::print(stderr, "{}: Expected {} field to be of type {}\n",
                        m.name.GetString(), "data_offsets", "array");
-                return;
+                return 1;
             }
 
             if (m.value["data_offsets"].GetArray().Size() != 2) {
                 fmt::print(stderr, "{}: Expected data_offsets to be array of size 2\n",
                        m.name.GetString());
-                return;
+                return 1;
             }
 
-            t.data = rcast<const i32*>(
+            t.data = rcast<const void*>(
                 /* Get data offset as base. */
                 m.value["data_offsets"].GetArray()[0].GetUint64() +
 
@@ -167,19 +196,24 @@ void test_matrix_vs_pytorch(const char * const filepath, test_flags_t flags)
                 /* Finally, offset from base of mmaped file to obtain data pointer. */
                 ftensors.begin()
             );
+
+            return 0;
         };
 
         switch (c) {
         case 'A':
-            parse_tensor_data(ttrip.a);
+            if (parse_tensor_data(ttrip.a))
+                return 1;
             break;
 
         case 'B':
-            parse_tensor_data(ttrip.b);
+            if (parse_tensor_data(ttrip.b))
+                return 1;
             break;
 
         case 'C':
-            parse_tensor_data(ttrip.c);
+            if (parse_tensor_data(ttrip.c))
+                return 1;
             break;
 
         default:
@@ -187,6 +221,19 @@ void test_matrix_vs_pytorch(const char * const filepath, test_flags_t flags)
             break;
         }
     }
+
+    return 0;
+}
+
+void test_matrix_vs_pytorch_i32(const char * const filepath, test_flags_t flags)
+{
+    auto ftensors = mipc::finbuf(filepath);
+    if (!ftensors)
+        throw test_failure("Failed to open safetensors file\n");
+
+    std::map<u64, test_tripplet> ttrips;
+    if (parse_safetensors(ftensors, ttrips))
+        return;
 
     const char * const filename = filename_from_path(filepath);
     timeit_t timer;
@@ -219,11 +266,19 @@ void test_matrix_vs_pytorch(const char * const filepath, test_flags_t flags)
         if (tensa.data == nullptr || tensb.data == nullptr || tensc.data == nullptr)
             throw test_failure(fmt::format("Incomplete data for id{}\n", test_id));
 
+        using dtype = safetensor::dtype;
+        if (tensa.type != dtype::i32 || tensb.type != dtype::i32 || tensc.type != dtype::i32)
+            throw test_failure(fmt::format(
+                "Mismatched tensor types for id{}. "
+                "Expected all to be i32, got A.dtype = {}, B.dtype = {}, C.dtype = {}",
+                test_id, dtype2str(tensa.type), dtype2str(tensb.type), dtype2str(tensc.type)
+            ));
+
 
         /* Prepare data from pytorch */
-        mat_i64_t mata = make_mat_from_tensor_data(tensa);
-        mat_i64_t matb = make_mat_from_tensor_data(tensb);
-        mat_i64_t matc_expected = make_mat_from_tensor_data(tensc);
+        mat_i64_t mata = make_mat_i32_from_tensor_data(tensa);
+        mat_i64_t matb = make_mat_i32_from_tensor_data(tensb);
+        mat_i64_t matc_expected = make_mat_i32_from_tensor_data(tensc);
 
 
         if (run_on_cpu) {
