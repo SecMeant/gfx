@@ -158,6 +158,7 @@ struct mat_base_t {
 };
 
 using mat_i64_t = mat_base_t<i64>;
+using mat_f32_t = mat_base_t<f32>;
 
 template<typename ParentType>
 struct matview_base_t {
@@ -231,6 +232,7 @@ struct matview_base_t {
 };
 
 using matview_i64_t = matview_base_t<mat_i64_t>;
+using matview_f32_t = matview_base_t<mat_f32_t>;
 
 constexpr bool mat_dim_match(matview_i64_t m0, matview_i64_t m1)
 {
