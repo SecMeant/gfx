@@ -43,7 +43,7 @@ struct mat_t {
 
         for (size_t y = 0; y < height; ++y)
             for (size_t x = 0; x < width; ++x)
-                this->operator[](x,y) = init[y][x];
+                this->at(x,y) = init[y][x];
     }
 
     static mat_t make_matrix(const u32 width, const u32 height, u32 stride = 0)
@@ -128,15 +128,27 @@ struct mat_t {
         memset_random(this->data.get(), this->num_elems() * sizeof(ValueType));
     }
 
-    ValueRef operator[](u32 x, u32 y)
+    ValueRef at(u32 x, u32 y)
     {
         return this->data[y * this->stride + x];
     }
 
-    ValueCRef operator[](u32 x, u32 y) const
+    ValueCRef at(u32 x, u32 y) const
     {
         return this->data[y * this->stride + x];
     }
+
+#if __cplusplus >= 202300L
+    ValueRef operator[](u32 x, u32 y)
+    {
+        return this->at(x, y);
+    }
+
+    ValueCRef operator[](u32 x, u32 y) const
+    {
+        return this->at(x, y);
+    }
+#endif
 
     std::unique_ptr<ValueType[]> data;
     u32 width;
@@ -176,15 +188,27 @@ struct matview_t {
     ,stride(stride)
     {}
 
-    ValueRef operator[](u32 x, u32 y)
+    ValueRef at(u32 x, u32 y)
     {
         return this->data[y * this->stride + x];
     }
 
-    ValueCRef operator[](u32 x, u32 y) const
+    ValueCRef at(u32 x, u32 y) const
     {
         return this->data[y * this->stride + x];
     }
+
+#if __cplusplus >= 202300L
+    ValueRef operator[](u32 x, u32 y)
+    {
+        return this->at(x, y);
+    }
+
+    ValueCRef operator[](u32 x, u32 y) const
+    {
+        return this->at(x, y);
+    }
+#endif
 
     size_t num_elems() const
     {
