@@ -280,6 +280,7 @@ constexpr static i64 STATUS_LINE_ALIGNMENT = 75;
 constexpr static i64 BENCHMARK_LINE_ALIGNMENT = 52;
 
 void test_matrix_vs_pytorch_i32(const char *safetensors_path, test_flags_t flags);
+void test_matrix_vs_pytorch_f32(const char *safetensors_path, test_flags_t flags);
 void test_threading(bool explicit_exit);
 
 static std::queue<std::string> test_status;
@@ -481,6 +482,51 @@ int run_tests()
                                   .skip_cpu = 1
                               }),
             .group = test_group::i64,
+        },
+
+
+        /* SAFETENSORS TESTS F32 */
+        {
+            .name = "test_matrix_vs_pytorch(pytorch_4x4_f32.safetensors)",
+            .func = std::bind(test_matrix_vs_pytorch_f32, CONFIG_TEST_FILES_PATH "pytorch_4x4_f32.safetensors",
+                              test_flags_t{}),
+            .group = test_group::f32,
+        },
+        {
+            .name = "test_matrix_vs_pytorch(pytorch_64x64_f32.safetensors)",
+            .func = std::bind(test_matrix_vs_pytorch_f32, CONFIG_TEST_FILES_PATH "pytorch_64x64_f32.safetensors",
+                              test_flags_t{}),
+            .group = test_group::f32,
+        },
+        {
+            .name = "test_matrix_vs_pytorch(pytorch_256x256_f32.safetensors)",
+            .func = std::bind(test_matrix_vs_pytorch_f32, CONFIG_TEST_FILES_PATH "pytorch_256x256_f32.safetensors",
+                              test_flags_t{}),
+            .group = test_group::f32,
+        },
+        {
+            .name = "test_matrix_vs_pytorch(pytorch_512x512_f32.safetensors)",
+            .func = std::bind(test_matrix_vs_pytorch_f32, CONFIG_TEST_FILES_PATH "pytorch_512x512_f32.safetensors",
+                              test_flags_t{
+                                  .skip_cpu = 1
+                              }),
+            .group = test_group::f32,
+        },
+        {
+            .name = "test_matrix_vs_pytorch(pytorch_1024x1024_f32.safetensors)",
+            .func = std::bind(test_matrix_vs_pytorch_f32, CONFIG_TEST_FILES_PATH "pytorch_1024x1024_f32.safetensors",
+                              test_flags_t{
+                                  .skip_cpu = 1
+                              }),
+            .group = test_group::f32,
+        },
+        {
+            .name = "test_matrix_vs_pytorch(pytorch_2048x2048_f32.safetensors)",
+            .func = std::bind(test_matrix_vs_pytorch_f32, CONFIG_TEST_FILES_PATH "pytorch_2048x2048_f32.safetensors",
+                              test_flags_t{
+                                  .skip_cpu = 1
+                              }),
+            .group = test_group::f32,
         },
     };
 

@@ -64,7 +64,8 @@ struct mat_base_t {
         return ret;
     }
 
-    static mat_base_t make_matrix_from_data(const i32 *data, const u32 width, const u32 height, u32 stride = 0)
+    template <typename T>
+    static mat_base_t make_matrix_from_data(const T *data, const u32 width, const u32 height, u32 stride = 0)
     {
         /* TODO: We don't always have to reallocate */
         mat_base_t ret = make_matrix(width, height, stride);

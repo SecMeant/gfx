@@ -64,6 +64,11 @@ static mat_i64_t make_mat_i32_from_tensor_data(const safetensor &tensor)
     return mat_i64_t::make_matrix_from_data(reinterpret_cast<const i32*>(tensor.data), tensor.cols, tensor.rows);
 }
 
+static mat_f32_t make_mat_f32_from_tensor_data(const safetensor &tensor)
+{
+    return mat_f32_t::make_matrix_from_data(reinterpret_cast<const f32*>(tensor.data), tensor.cols, tensor.rows);
+}
+
 static const char* filename_from_path(std::string_view filepath)
 {
     const auto pos = filepath.find_last_of('/');
@@ -417,3 +422,55 @@ void test_matrix_vs_pytorch_i32(const char * const filepath, test_flags_t flags)
         benchinfo.add(fmt::format("{: <{}}cuda_test_25k", filename, align), dur_cuda_test / num_runs);
 }
 
+void test_matrix_vs_pytorch_f32(const char * const filepath, test_flags_t flags)
+{
+    auto ftensors = mipc::finbuf(filepath);
+    if (!ftensors)
+        throw test_failure("Failed to open safetensors file\n");
+
+    std::map<u64, test_tripplet> ttrips;
+    if (parse_safetensors(ftensors, ttrips))
+        return;
+
+    const char * const filename = filename_from_path(filepath);
+    timeit_t timer;
+
+    /*
+     * Convert safetensor file data to internal format.
+     * Compute result and compare against the result from file.
+     */
+    for (const auto &ttrip: ttrips) {
+        const auto& test_id = ttrip.first;
+        const auto& tensa   = ttrip.second.a;
+        const auto& tensb   = ttrip.second.b;
+        const auto& tensc   = ttrip.second.c;
+
+        std::string test_name;
+        const bool run_on_cpu = !flags.skip_cpu;
+        const bool run_opencl = true;
+        const bool run_cuda = true;
+
+        if (tensa.data == nullptr || tensb.data == nullptr || tensc.data == nullptr)
+            throw test_failure(fmt::format("Incomplete data for id{}\n", test_id));
+
+        using dtype = safetensor::dtype;
+        if (tensa.type != dtype::f32 || tensb.type != dtype::f32 || tensc.type != dtype::f32)
+            throw test_failure(fmt::format(
+                "Mismatched tensor types for id{}. "
+                "Expected all to be f32, got A.dtype = {}, B.dtype = {}, C.dtype = {}",
+                test_id, dtype2str(tensa.type), dtype2str(tensb.type), dtype2str(tensc.type)
+            ));
+
+        /* Prepare data from pytorch */
+        mat_f32_t mata = make_mat_f32_from_tensor_data(tensa);
+        mat_f32_t matb = make_mat_f32_from_tensor_data(tensb);
+        mat_f32_t matc_expected = make_mat_f32_from_tensor_data(tensc);
+
+        if (run_on_cpu) {
+            mat_f32_t matc_computed = strassen_cpu(mata, matb);
+
+            test_name = fmt::format("{}.{}.{}", filepath, test_id, "mat_mul_cpu");
+            mat_compare_or_fail(test_name.c_str(), matc_computed, matc_expected, mata, matb, mat_op::mul);
+        }
+    }
+}
