@@ -3,12 +3,17 @@
 
 #include <cassert>
 
-mat_i64_t mat_add_cpu(matview_i64_t lhs, matview_i64_t rhs)
+/*
+ * Common implementations for matrix operations on CPU
+ */
+
+template <typename MatrixType, typename ViewType>
+MatrixType mat_add_cpu_(ViewType lhs, ViewType rhs)
 {
     assert(lhs.width == rhs.width);
     assert(lhs.height == rhs.height);
 
-    mat_i64_t out = mat_i64_t::make_matrix_zero(lhs.width, lhs.height, lhs.stride);
+    MatrixType out = MatrixType::make_matrix_zero(lhs.width, lhs.height, lhs.stride);
 
     for (u32 y = 0; y < lhs.height; ++y)
         for (u32 x = 0; x < lhs.width; ++x)
@@ -17,12 +22,13 @@ mat_i64_t mat_add_cpu(matview_i64_t lhs, matview_i64_t rhs)
     return out;
 }
 
-mat_i64_t mat_sub_cpu(matview_i64_t lhs, matview_i64_t rhs)
+template <typename MatrixType, typename ViewType>
+MatrixType mat_sub_cpu_(ViewType lhs, ViewType rhs)
 {
     assert(lhs.width == rhs.width);
     assert(lhs.height == rhs.height);
 
-    mat_i64_t out = mat_i64_t::make_matrix_zero(lhs.width, lhs.height, lhs.stride);
+    MatrixType out = MatrixType::make_matrix_zero(lhs.width, lhs.height, lhs.stride);
 
     for (u32 y = 0; y < lhs.height; ++y)
         for (u32 x = 0; x < lhs.width; ++x)
@@ -31,12 +37,13 @@ mat_i64_t mat_sub_cpu(matview_i64_t lhs, matview_i64_t rhs)
     return out;
 }
 
-mat_i64_t mat_mul_cpu(matview_i64_t lhs, matview_i64_t rhs)
+template <typename MatrixType, typename ViewType>
+MatrixType mat_mul_cpu_(ViewType lhs, ViewType rhs)
 {
     assert(lhs.width == rhs.height);
     assert(lhs.height == rhs.width);
 
-    mat_i64_t out = mat_i64_t::make_matrix_zero(lhs.height, rhs.width);
+    MatrixType out = MatrixType::make_matrix_zero(lhs.height, rhs.width);
 
     for (u32 y = 0; y < lhs.height; ++y)
         for (u32 x = 0; x < lhs.width; ++x)
@@ -46,7 +53,8 @@ mat_i64_t mat_mul_cpu(matview_i64_t lhs, matview_i64_t rhs)
     return out;
 }
 
-void mat_copy(matview_i64_t dst, matview_i64_t src)
+template <typename ViewType>
+void mat_copy_(ViewType dst, ViewType src)
 {
     assert(dst.width == src.width);
     assert(dst.height == src.height);
@@ -59,24 +67,51 @@ void mat_copy(matview_i64_t dst, matview_i64_t src)
             dst[x, y] = src[x, y];
 }
 
-static void assert_mat_square(matview_i64_t m)
+mat_i64_t mat_add_cpu(matview_i64_t lhs, matview_i64_t rhs)
+{ return mat_add_cpu_<mat_i64_t, matview_i64_t>(lhs, rhs); }
+
+mat_i64_t mat_sub_cpu(matview_i64_t lhs, matview_i64_t rhs)
+{ return mat_sub_cpu_<mat_i64_t, matview_i64_t>(lhs, rhs); }
+
+mat_i64_t mat_mul_cpu(matview_i64_t lhs, matview_i64_t rhs)
+{ return mat_mul_cpu_<mat_i64_t, matview_i64_t>(lhs, rhs); }
+
+void mat_copy(matview_i64_t dst, matview_i64_t src)
+{ mat_copy_<matview_i64_t>(dst, src); }
+
+mat_f32_t mat_add_cpu(matview_f32_t lhs, matview_f32_t rhs)
+{ return mat_add_cpu_<mat_f32_t, matview_f32_t>(lhs, rhs); }
+
+mat_f32_t mat_sub_cpu(matview_f32_t lhs, matview_f32_t rhs)
+{ return mat_sub_cpu_<mat_f32_t, matview_f32_t>(lhs, rhs); }
+
+mat_f32_t mat_mul_cpu(matview_f32_t lhs, matview_f32_t rhs)
+{ return mat_mul_cpu_<mat_f32_t, matview_f32_t>(lhs, rhs); }
+
+void mat_copy(matview_f32_t dst, matview_f32_t src)
+{ mat_copy_<matview_f32_t>(dst, src); }
+
+template <typename ViewType>
+static void assert_mat_square(ViewType m)
 {
     assert(m.width == m.height);
 }
 
-static void assert_mat_mullable(matview_i64_t lhs, matview_i64_t rhs)
+template <typename ViewType>
+static void assert_mat_mullable(ViewType lhs, ViewType rhs)
 {
     /* We don't support non square for now. */
-    assert_mat_square(lhs);
-    assert_mat_square(rhs);
+    assert_mat_square<ViewType>(lhs);
+    assert_mat_square<ViewType>(rhs);
     assert(lhs.width == rhs.width);
 }
 
-static mat_i64_t strassen_cpu_small_(matview_i64_t lhs, matview_i64_t rhs, mat_i64_t out)
+template <typename ViewType, typename MatrixType = ViewType::ParentType>
+MatrixType strassen_cpu_small_(ViewType lhs, ViewType rhs, MatrixType out)
 {
-    assert_mat_square(lhs);
-    assert_mat_square(rhs);
-    assert_mat_square(out);
+    assert_mat_square<ViewType>(lhs);
+    assert_mat_square<ViewType>(rhs);
+    assert_mat_square<ViewType>(out);
     assert(lhs.width == rhs.width);
     assert(lhs.width == out.width);
 
@@ -85,40 +120,41 @@ static mat_i64_t strassen_cpu_small_(matview_i64_t lhs, matview_i64_t rhs, mat_i
     return out;
 }
 
-mat_i64_t strassen_cpu(matview_i64_t lhs, matview_i64_t rhs)
+template <typename ViewType, typename MatrixType = ViewType::ParentType>
+MatrixType strassen_cpu_common(ViewType lhs, ViewType rhs)
 {
-    assert_mat_mullable(lhs, rhs);
+    assert_mat_mullable<ViewType>(lhs, rhs);
 
-    mat_i64_t out = mat_i64_t::make_matrix_zero(lhs.width, lhs.height, lhs.stride);
+    MatrixType out = MatrixType::make_matrix_zero(lhs.width, lhs.height, lhs.stride);
 
     if (lhs.width <= 4)
-        return strassen_cpu_small_(lhs, rhs, std::move(out));
+        return strassen_cpu_small_<ViewType>(lhs, rhs, std::move(out));
 
     assert(lhs.width % 4 == 0);
     const auto quarter_size = lhs.width / 2;
 
-    matview_i64_t a11(&lhs[0,0], quarter_size, quarter_size, lhs.stride);
-    matview_i64_t a12(&lhs[quarter_size,0], quarter_size, quarter_size, lhs.stride);
-    matview_i64_t a21(&lhs[0,quarter_size], quarter_size, quarter_size, lhs.stride);
-    matview_i64_t a22(&lhs[quarter_size,quarter_size], quarter_size, quarter_size, lhs.stride);
+    ViewType a11(&lhs[0,0], quarter_size, quarter_size, lhs.stride);
+    ViewType a12(&lhs[quarter_size,0], quarter_size, quarter_size, lhs.stride);
+    ViewType a21(&lhs[0,quarter_size], quarter_size, quarter_size, lhs.stride);
+    ViewType a22(&lhs[quarter_size,quarter_size], quarter_size, quarter_size, lhs.stride);
 
-    matview_i64_t b11(&rhs[0,0], quarter_size, quarter_size, rhs.stride);
-    matview_i64_t b12(&rhs[quarter_size,0], quarter_size, quarter_size, rhs.stride);
-    matview_i64_t b21(&rhs[0,quarter_size], quarter_size, quarter_size, rhs.stride);
-    matview_i64_t b22(&rhs[quarter_size,quarter_size], quarter_size, quarter_size, rhs.stride);
+    ViewType b11(&rhs[0,0], quarter_size, quarter_size, rhs.stride);
+    ViewType b12(&rhs[quarter_size,0], quarter_size, quarter_size, rhs.stride);
+    ViewType b21(&rhs[0,quarter_size], quarter_size, quarter_size, rhs.stride);
+    ViewType b22(&rhs[quarter_size,quarter_size], quarter_size, quarter_size, rhs.stride);
 
-    mat_i64_t m1 = strassen_cpu(mat_add_cpu(a11, a22), mat_add_cpu(b11, b22));
-    mat_i64_t m2 = strassen_cpu(mat_add_cpu(a21, a22), b11);
-    mat_i64_t m3 = strassen_cpu(a11, mat_sub_cpu(b12, b22));
-    mat_i64_t m4 = strassen_cpu(a22, mat_sub_cpu(b21, b11));
-    mat_i64_t m5 = strassen_cpu(mat_add_cpu(a11, a12), b22);
-    mat_i64_t m6 = strassen_cpu(mat_sub_cpu(a21, a11), mat_add_cpu(b11, b12));
-    mat_i64_t m7 = strassen_cpu(mat_sub_cpu(a12, a22), mat_add_cpu(b21, b22));
+    MatrixType m1 = strassen_cpu(mat_add_cpu(a11, a22), mat_add_cpu(b11, b22));
+    MatrixType m2 = strassen_cpu(mat_add_cpu(a21, a22), b11);
+    MatrixType m3 = strassen_cpu(a11, mat_sub_cpu(b12, b22));
+    MatrixType m4 = strassen_cpu(a22, mat_sub_cpu(b21, b11));
+    MatrixType m5 = strassen_cpu(mat_add_cpu(a11, a12), b22);
+    MatrixType m6 = strassen_cpu(mat_sub_cpu(a21, a11), mat_add_cpu(b11, b12));
+    MatrixType m7 = strassen_cpu(mat_sub_cpu(a12, a22), mat_add_cpu(b21, b22));
 
-    matview_i64_t c11(&out[0,0], quarter_size, quarter_size, out.stride);
-    matview_i64_t c12(&out[quarter_size,0], quarter_size, quarter_size, out.stride);
-    matview_i64_t c21(&out[0,quarter_size], quarter_size, quarter_size, out.stride);
-    matview_i64_t c22(&out[quarter_size,quarter_size], quarter_size, quarter_size, out.stride);
+    ViewType c11(&out[0,0], quarter_size, quarter_size, out.stride);
+    ViewType c12(&out[quarter_size,0], quarter_size, quarter_size, out.stride);
+    ViewType c21(&out[0,quarter_size], quarter_size, quarter_size, out.stride);
+    ViewType c22(&out[quarter_size,quarter_size], quarter_size, quarter_size, out.stride);
 
     mat_copy(c11, mat_add_cpu(mat_sub_cpu(mat_add_cpu(m1, m4), m5), m7));
     mat_copy(c12, mat_add_cpu(m3, m5));
@@ -127,3 +163,10 @@ mat_i64_t strassen_cpu(matview_i64_t lhs, matview_i64_t rhs)
 
     return out;
 }
+
+mat_i64_t strassen_cpu(matview_i64_t lhs, matview_i64_t rhs)
+{ return strassen_cpu_common(lhs, rhs); }
+
+mat_f32_t strassen_cpu(matview_f32_t lhs, matview_f32_t rhs)
+{ return strassen_cpu_common(lhs, rhs); }
+

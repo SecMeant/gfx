@@ -261,3 +261,14 @@ mat_i64_t mat_mul_cu_umem_tiled(matview_i64_t lhs, matview_i64_t rhs);
 mat_i64_t mat_mul_cu_tiled(matview_i64_t lhs, matview_i64_t rhs);
 mat_i64_t mat_mul_cu_test(matview_i64_t lhs, matview_i64_t rhs);
 
+
+/*
+ * F32 API
+ */
+
+mat_f32_t mat_add_cpu(matview_f32_t lhs, matview_f32_t rhs);
+mat_f32_t mat_sub_cpu(matview_f32_t lhs, matview_f32_t rhs);
+mat_f32_t mat_mul_cpu(matview_f32_t lhs, matview_f32_t rhs);
+void mat_copy(matview_f32_t dst, matview_f32_t src);
+
+mat_f32_t strassen_cpu(matview_f32_t lhs, matview_f32_t rhs);
