@@ -113,13 +113,11 @@ static int init_kernel_context()
     return 0;
 }
 
-
-static int run_kernel(matview_i64_t lhs, matview_i64_t rhs, mat_i64_t &out_)
+static int run_kernel(matview_i64_t lhs, matview_i64_t rhs, matview_i64_t out)
 {
     int err;
 
     /* Actual work */
-    mat_i64_t out = mat_i64_t::make_matrix_zero(lhs.height, rhs.width);
     cl_command_queue queue;
     cl_kernel kernel;
     cl_mem cl_out_buffer;
@@ -218,7 +216,7 @@ static int run_kernel(matview_i64_t lhs, matview_i64_t rhs, mat_i64_t &out_)
 
     clFinish(queue);
 
-    err = clEnqueueReadBuffer(queue, cl_out_buffer, CL_TRUE, 0, cl_out_buffer_size, out.data.get(), 0, NULL, NULL);
+    err = clEnqueueReadBuffer(queue, cl_out_buffer, CL_TRUE, 0, cl_out_buffer_size, out.data, 0, NULL, NULL);
     if (err < 0) {
         fprintf(stderr, "clEnqueueReadBuffer: %d\n", err);
         return 1;
@@ -231,8 +229,6 @@ static int run_kernel(matview_i64_t lhs, matview_i64_t rhs, mat_i64_t &out_)
     clReleaseMemObject(cl_lhs_buffer);
     clReleaseKernel(kernel);
     clReleaseCommandQueue(queue);
-
-    out_ = std::move(out);
 
     return 0;
 }
@@ -249,10 +245,9 @@ mat_i64_t mat_sub_cl(matview_i64_t lhs, matview_i64_t rhs)
 
 mat_i64_t mat_mul_cl(matview_i64_t lhs, matview_i64_t rhs)
 {
-    mat_i64_t ret;
+    mat_i64_t ret = mat_i64_t::make_matrix_zero(lhs.height, rhs.width);
 
     run_kernel(lhs, rhs, ret);
 
     return ret;
 }
-
