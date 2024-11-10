@@ -240,6 +240,11 @@ constexpr bool mat_dim_match(matview_i64_t m0, matview_i64_t m1)
     return m0.width == m1.width && m0.height == m1.height;
 }
 
+
+/*
+ * I32 API
+ */
+
 mat_i64_t mat_add_cpu(matview_i64_t lhs, matview_i64_t rhs);
 mat_i64_t mat_sub_cpu(matview_i64_t lhs, matview_i64_t rhs);
 mat_i64_t mat_mul_cpu(matview_i64_t lhs, matview_i64_t rhs);
