@@ -15,9 +15,16 @@ struct [[maybe_unused]] {
     std::atomic_uint64_t num_failed = 0;
 } inline test_stats;
 
+enum class test_group {
+    common = 0,
+    i64,
+    f32,
+};
+
 struct test {
     std::string name;
     std::function<void()> func;
+    test_group group = test_group::common;
 };
 
 struct test_flags_t {

@@ -351,27 +351,32 @@ static void RUN_TEST(const test& test)
 
 int run_tests()
 {
-    const std::vector<test> tests {
+    const std::vector<test> all_tests {
         /* SIMPLE CPU TESTS */
         {
             .name = "test_threading(explicit_exit = 0)",
             .func = std::bind(test_threading, false),
+            .group = test_group::i64,
         },
         {
             .name = "test_threading(explicit_exit = 1)",
             .func = std::bind(test_threading, true),
+            .group = test_group::i64,
         },
         {
-            .name = "test_matrix_simple_add",
-            .func = std::bind(test_matrix_simple_add),
+            .name = "test_matrix_simple_add_i64",
+            .func = std::bind(test_matrix_simple_add<mat_i64_t>),
+            .group = test_group::i64,
         },
         {
-            .name = "test_matrix_simple_mul",
-            .func = std::bind(test_matrix_simple_mul),
+            .name = "test_matrix_simple_mul_i64",
+            .func = std::bind(test_matrix_simple_mul<mat_i64_t>),
+            .group = test_group::i64,
         },
         {
-            .name = "test_matrix_simple_strassen_mul",
-            .func = std::bind(test_matrix_simple_strassen_mul),
+            .name = "test_matrix_simple_strassen_mul_i64",
+            .func = std::bind(test_matrix_simple_strassen_mul<mat_i64_t>),
+            .group = test_group::i64,
         },
 
 
@@ -379,6 +384,7 @@ int run_tests()
         {
             .name = "test_matrix_simple_opencl_mul",
             .func = std::bind(test_matrix_simple_opencl_mul),
+            .group = test_group::i64,
         },
 
 
@@ -387,21 +393,25 @@ int run_tests()
             .name = "test_matrix_vs_pytorch(pytorch_4x4.safetensors)",
             .func = std::bind(test_matrix_vs_pytorch_i32, CONFIG_TEST_FILES_PATH "pytorch_4x4.safetensors",
                               test_flags_t{}),
+            .group = test_group::i64,
         },
         {
             .name = "test_matrix_vs_pytorch(pytorch_64x64.safetensors)",
             .func = std::bind(test_matrix_vs_pytorch_i32, CONFIG_TEST_FILES_PATH "pytorch_64x64.safetensors",
                               test_flags_t{}),
+            .group = test_group::i64,
         },
         {
             .name = "test_matrix_vs_pytorch(pytorch_128x128.safetensors)",
             .func = std::bind(test_matrix_vs_pytorch_i32, CONFIG_TEST_FILES_PATH "pytorch_128x128.safetensors",
                               test_flags_t{}),
+            .group = test_group::i64,
         },
         {
             .name = "test_matrix_vs_pytorch(pytorch_256x256.safetensors)",
             .func = std::bind(test_matrix_vs_pytorch_i32, CONFIG_TEST_FILES_PATH "pytorch_256x256.safetensors",
                               test_flags_t{}),
+            .group = test_group::i64,
         },
         {
             .name = "test_matrix_vs_pytorch(pytorch_512x512.safetensors)",
@@ -409,6 +419,7 @@ int run_tests()
                               test_flags_t{
                                   .skip_cpu = 1
                               }),
+            .group = test_group::i64,
         },
         {
             .name = "test_matrix_vs_pytorch(pytorch_1024x1024.safetensors)",
@@ -416,6 +427,7 @@ int run_tests()
                               test_flags_t{
                                   .skip_cpu = 1
                               }),
+            .group = test_group::i64,
         },
         {
             .name = "test_matrix_vs_pytorch(pytorch_2048x2048.safetensors)",
@@ -423,6 +435,7 @@ int run_tests()
                               test_flags_t{
                                   .skip_cpu = 1
                               }),
+            .group = test_group::i64,
         },
     };
 
