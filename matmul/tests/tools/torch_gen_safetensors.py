@@ -26,6 +26,8 @@ parser.add_argument('-n', '--repeat', dest = 'n', default = 32, required = True,
 
 parser.add_argument('-t', '--type', choices = ['i32', 'f32'], default = 'i64', type = str)
 
+parser.add_argument('--verbose', action = 'store_true', default = False)
+
 args = parser.parse_args()
 
 import torch
@@ -47,6 +49,9 @@ for i in range(args.n):
     tensors[f'A{i}'] = A
     tensors[f'B{i}'] = B
     tensors[f'C{i}'] = C
+
+    if args.verbose:
+        print(f'{A=}\n{B=}\n{C=}\n')
 
 save_file(tensors, args.out)
 
