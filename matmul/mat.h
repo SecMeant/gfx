@@ -160,8 +160,9 @@ struct mat_base_t {
 using mat_i64_t = mat_base_t<i64>;
 using mat_f32_t = mat_base_t<f32>;
 
-template<typename ParentType>
+template<typename ParentType_>
 struct matview_base_t {
+    using ParentType = ParentType_;
     using ValueType = typename ParentType::ValueType;
     using ValueRef = ValueType&;
     using ValueCRef = const ValueType&;
