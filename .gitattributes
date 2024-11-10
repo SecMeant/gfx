@@ -1,3 +1,6 @@
 matmul/tests/files/pytorch_512x512.safetensors filter=lfs diff=lfs merge=lfs -text
 matmul/tests/files/pytorch_1024x1024.safetensors filter=lfs diff=lfs merge=lfs -text
 tests/files/pytorch_2048x2048.safetensors filter=lfs diff=lfs merge=lfs -text
+matmul/tests/files/pytorch_2048x2048_f32.safetensors filter=lfs diff=lfs merge=lfs -text
+matmul/tests/files/pytorch_1024x1024_f32.safetensors filter=lfs diff=lfs merge=lfs -text
+matmul/tests/files/pytorch_512x512_f32.safetensors filter=lfs diff=lfs merge=lfs -text
