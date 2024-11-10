@@ -530,6 +530,18 @@ int run_tests()
         },
     };
 
+    std::vector<const test*> tests;
+    tests.reserve(all_tests.size());
+    for (const auto &test : all_tests) {
+        if (test.group == test_group::i64 && !opt_enable_i64)
+            continue;
+
+        if (test.group == test_group::f32 && !opt_enable_f32)
+            continue;
+
+        tests.emplace_back(&test);
+    }
+
     const u32 num_threads = [&] {
         if (opt_num_threads != 0)
             return opt_num_threads;
@@ -550,7 +562,7 @@ int run_tests()
         u32 job_id = thread_id;
 
         while (job_id < tests.size()) {
-            RUN_TEST(tests[job_id]);
+            RUN_TEST(*tests[job_id]);
             job_id += batch_size;
         }
     });
@@ -582,6 +594,9 @@ int main(int argc, char **argv)
 {
     int ret = 0;
     u32 num_threads = 0;
+    bool explicit_enable = false;
+    bool explicit_enable_f32 = false;
+    bool explicit_enable_i64 = false;
 
     for (int arg = 1; arg < argc; ++arg) {
         const char *s = argv[arg];
@@ -593,6 +608,9 @@ int main(int argc, char **argv)
                 "       --bench        Print detailed branchmarking/timing information\n"
                 "  -n,  --threads      Number of threads to run in parallel when running benchmarks\n"
                 "       --test         Test cuda kernels\n"
+                "  -e,  --enable       Enable tests from group and run only them\n"
+                "                        -ef32 | --enablef32 # Enables float32 tests\n"
+                "                        -ei64 | --enablei64 # Enables int64 tests\n"
             );
             return 0;
         }
@@ -616,6 +634,23 @@ int main(int argc, char **argv)
             opt_test = true;
             continue;
         }
+
+        if (strcmp(s, "-ei64") == 0 || strcmp(s, "--enablei64") == 0) {
+            explicit_enable     = true;
+            explicit_enable_i64 = true;
+            continue;
+        }
+
+        if (strcmp(s, "-ef32") == 0 || strcmp(s, "--enablef32") == 0) {
+            explicit_enable     = true;
+            explicit_enable_f32 = true;
+            continue;
+        }
+    }
+
+    if (explicit_enable) {
+        opt_enable_i64 = explicit_enable_i64;
+        opt_enable_f32 = explicit_enable_f32;
     }
 
     matmul_cu_init(opt_list_cuda);
