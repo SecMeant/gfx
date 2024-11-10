@@ -8,7 +8,7 @@ template <typename MatrixType>
 struct print_mat_format_;
 
 template<> struct print_mat_format_<matview_i64_t> { constexpr static decltype(auto) format = "%016lX,"; };
-template<> struct print_mat_format_<matview_f32_t> { constexpr static decltype(auto) format = "% 10.2f,"; };
+template<> struct print_mat_format_<matview_f32_t> { constexpr static decltype(auto) format = "% 12.2f,"; };
 
 template <typename T>
 constexpr static decltype(auto) print_mat_format = print_mat_format_<T>::format;

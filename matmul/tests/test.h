@@ -74,5 +74,13 @@ void mat_compare_or_fail(
     matview_i64_t rhs = matview_i64_t(),
     mat_op op = mat_op::none
 );
+void mat_compare_or_fail(
+    const char *test_name,
+    matview_f32_t actual,
+    matview_f32_t expected,
+    matview_f32_t lhs = matview_f32_t(),
+    matview_f32_t rhs = matview_f32_t(),
+    mat_op op = mat_op::none
+);
 
 

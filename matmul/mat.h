@@ -235,7 +235,8 @@ struct matview_base_t {
 using matview_i64_t = matview_base_t<mat_i64_t>;
 using matview_f32_t = matview_base_t<mat_f32_t>;
 
-constexpr bool mat_dim_match(matview_i64_t m0, matview_i64_t m1)
+template <typename MatViewType>
+constexpr bool mat_dim_match(MatViewType m0, MatViewType m1)
 {
     return m0.width == m1.width && m0.height == m1.height;
 }
