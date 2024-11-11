@@ -607,7 +607,7 @@ int main(int argc, char **argv)
                 "  -lc, --list-cuda    List available cuda devices\n"
                 "       --bench        Print detailed branchmarking/timing information\n"
                 "  -n,  --threads      Number of threads to run in parallel when running benchmarks\n"
-                "       --test         Test cuda kernels\n"
+                "       --test         Run test cuda kernel\n"
                 "  -e,  --enable       Enable tests from group and run only them\n"
                 "                        -ef32 | --enablef32 # Enables float32 tests\n"
                 "                        -ei64 | --enablei64 # Enables int64 tests\n"
