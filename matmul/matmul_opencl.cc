@@ -247,16 +247,6 @@ static int run_kernel(matview_void_t lhs, matview_void_t rhs, matview_void_t out
     return 0;
 }
 
-mat_i64_t mat_add_cl(matview_i64_t lhs, matview_i64_t rhs)
-{
-    return mat_i64_t();
-}
-
-mat_i64_t mat_sub_cl(matview_i64_t lhs, matview_i64_t rhs)
-{
-    return mat_i64_t();
-}
-
 mat_i64_t mat_mul_cl(matview_i64_t lhs, matview_i64_t rhs)
 {
     mat_i64_t ret = mat_i64_t::make_matrix_zero(lhs.height, rhs.width);

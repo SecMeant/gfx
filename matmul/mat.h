@@ -326,8 +326,6 @@ void mat_copy(matview_i64_t dst, matview_i64_t src);
 
 mat_i64_t strassen_cpu(matview_i64_t lhs, matview_i64_t rhs);
 
-mat_i64_t mat_add_cl(matview_i64_t lhs, matview_i64_t rhs);
-mat_i64_t mat_sub_cl(matview_i64_t lhs, matview_i64_t rhs);
 mat_i64_t mat_mul_cl(matview_i64_t lhs, matview_i64_t rhs);
 
 mat_i64_t mat_mul_cu(matview_i64_t lhs, matview_i64_t rhs);
@@ -347,8 +345,6 @@ void mat_copy(matview_f32_t dst, matview_f32_t src);
 
 mat_f32_t strassen_cpu(matview_f32_t lhs, matview_f32_t rhs);
 
-mat_f32_t mat_add_cl(matview_f32_t lhs, matview_f32_t rhs);
-mat_f32_t mat_sub_cl(matview_f32_t lhs, matview_f32_t rhs);
 mat_f32_t mat_mul_cl(matview_f32_t lhs, matview_f32_t rhs);
 
 mat_f32_t mat_mul_cu(matview_f32_t lhs, matview_f32_t rhs);
