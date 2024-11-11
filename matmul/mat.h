@@ -295,6 +295,8 @@ template<> struct matview_base_t<void> {
         case mat_type_e::f32:
             return this->num_elems() * sizeof(f32);
         }
+
+        __builtin_unreachable();
     }
 
     void *data;

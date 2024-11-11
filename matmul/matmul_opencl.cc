@@ -138,6 +138,8 @@ static int run_kernel(matview_void_t lhs, matview_void_t rhs, matview_void_t out
         case mat_type_e::f32:
             return "matmul_f32";
         }
+
+        __builtin_unreachable();
     }();
 
     err = init_kernel_context();
