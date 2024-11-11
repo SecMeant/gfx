@@ -113,7 +113,7 @@ static int init_kernel_context()
     return 0;
 }
 
-static int run_kernel(matview_i64_t lhs, matview_i64_t rhs, matview_i64_t out)
+static int run_kernel(matview_void_t lhs, matview_void_t rhs, matview_void_t out)
 {
     int err;
 
@@ -127,6 +127,18 @@ static int run_kernel(matview_i64_t lhs, matview_i64_t rhs, matview_i64_t out)
     u32 cl_lhs_buffer_size = cl_size_round(lhs.size_bytes());
     u32 cl_rhs_buffer_size = cl_size_round(rhs.size_bytes());
     size_t local_size = 0, global_size = 0;
+
+    const char * const kernel_name = [&]{
+        assert(lhs.type == rhs.type);
+        assert(lhs.type == out.type);
+
+        switch(lhs.type) {
+        case mat_type_e::i64:
+            return "matmul_i64";
+        case mat_type_e::f32:
+            return "matmul_f32";
+        }
+    }();
 
     err = init_kernel_context();
     if (err)
@@ -142,7 +154,7 @@ static int run_kernel(matview_i64_t lhs, matview_i64_t rhs, matview_i64_t out)
         return 1;
     }
 
-    kernel = clCreateKernel(program, "matmul", &err);
+    kernel = clCreateKernel(program, kernel_name, &err);
     if (err < 0) {
         fprintf(stderr, "clCreateKernel: %d\n", err);
         return 1;
@@ -246,6 +258,15 @@ mat_i64_t mat_sub_cl(matview_i64_t lhs, matview_i64_t rhs)
 mat_i64_t mat_mul_cl(matview_i64_t lhs, matview_i64_t rhs)
 {
     mat_i64_t ret = mat_i64_t::make_matrix_zero(lhs.height, rhs.width);
+
+    run_kernel(lhs, rhs, ret);
+
+    return ret;
+}
+
+mat_f32_t mat_mul_cl(matview_f32_t lhs, matview_f32_t rhs)
+{
+    mat_f32_t ret = mat_f32_t::make_matrix_zero(lhs.height, rhs.width);
 
     run_kernel(lhs, rhs, ret);
 
