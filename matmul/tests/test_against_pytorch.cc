@@ -398,7 +398,7 @@ void test_matrix_vs_pytorch_i32(const char * const filepath, test_flags_t flags)
      */
 
     const auto num_runs = ttrips.size();
-    constexpr u32 align = 32u;
+    constexpr u32 align = 36u;
 
     if (dur_cpu.count())
         benchinfo.add(fmt::format("{: <{}}cpu", filename, align), dur_cpu / num_runs);
