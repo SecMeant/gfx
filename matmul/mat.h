@@ -236,6 +236,76 @@ struct matview_base_t {
 using matview_i64_t = matview_base_t<mat_i64_t>;
 using matview_f32_t = matview_base_t<mat_f32_t>;
 
+enum class mat_type_e {
+    i64,
+    f32,
+};
+
+template<> struct matview_base_t<void> {
+    constexpr matview_base_t(void *d, u32 w, u32 h, u32 s, mat_type_e t)
+    :data(d)
+    ,width(w)
+    ,height(h)
+    ,stride(s)
+    ,type(t)
+    {}
+
+    constexpr matview_base_t(mat_i64_t &m)
+    :data(m.data.get())
+    ,width(m.width)
+    ,height(m.height)
+    ,stride(m.stride)
+    ,type(mat_type_e::i64)
+    {}
+
+    constexpr matview_base_t(matview_i64_t mv)
+    :data(mv.data)
+    ,width(mv.width)
+    ,height(mv.height)
+    ,stride(mv.stride)
+    ,type(mat_type_e::i64)
+    {}
+
+    constexpr matview_base_t(mat_f32_t &m)
+    :data(m.data.get())
+    ,width(m.width)
+    ,height(m.height)
+    ,stride(m.stride)
+    ,type(mat_type_e::f32)
+    {}
+
+    constexpr matview_base_t(matview_f32_t mv)
+    :data(mv.data)
+    ,width(mv.width)
+    ,height(mv.height)
+    ,stride(mv.stride)
+    ,type(mat_type_e::f32)
+    {}
+
+    size_t num_elems() const
+    {
+        return this->height * this->stride;
+    }
+
+    size_t size_bytes() const
+    {
+        switch(this->type) {
+        case mat_type_e::i64:
+            return this->num_elems() * sizeof(i64);
+        case mat_type_e::f32:
+            return this->num_elems() * sizeof(f32);
+        }
+    }
+
+    void *data;
+    u32 width;
+    u32 height;
+    u32 stride;
+    mat_type_e type;
+};
+
+using matview_void_t = matview_base_t<void>;
+
 template <typename MatViewType>
 constexpr bool mat_dim_match(MatViewType m0, MatViewType m1)
 {
