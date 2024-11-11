@@ -435,6 +435,11 @@ void test_matrix_vs_pytorch_f32(const char * const filepath, test_flags_t flags)
     const char * const filename = filename_from_path(filepath);
     timeit_t timer;
 
+    /* For calculating averages. */
+    auto dur_cpu             = timeit_t::Duration::zero();
+    auto dur_strassen_cpu    = timeit_t::Duration::zero();
+    auto dur_cl              = timeit_t::Duration::zero();
+
     /*
      * Convert safetensor file data to internal format.
      * Compute result and compare against the result from file.
@@ -467,10 +472,64 @@ void test_matrix_vs_pytorch_f32(const char * const filepath, test_flags_t flags)
         mat_f32_t matc_expected = make_mat_f32_from_tensor_data(tensc);
 
         if (run_on_cpu) {
-            mat_f32_t matc_computed = strassen_cpu(mata, matb);
+            /* Test using mat_mul_cpu() */
+            timer.start();
+            mat_f32_t matc_computed = mat_mul_cpu(mata, matb);
+            timer.stop();
+
+            dur_cpu += timer.get_duration();
+
+            TEST_ASSERT(matc_expected.width == matc_computed.width);
+            TEST_ASSERT(matc_expected.height == matc_computed.height);
 
             test_name = fmt::format("{}.{}.{}", filepath, test_id, "mat_mul_cpu");
             mat_compare_or_fail(test_name.c_str(), matc_computed, matc_expected, mata, matb, mat_op::mul);
+
+
+            /* Test using strassen_cpu() */
+            timer.start();
+            mat_f32_t matc_computed_strassen = strassen_cpu(mata, matb);
+            timer.stop();
+
+            dur_strassen_cpu += timer.get_duration();
+
+            TEST_ASSERT(matc_expected.width == matc_computed_strassen.width);
+            TEST_ASSERT(matc_expected.height == matc_computed_strassen.height);
+
+            test_name = fmt::format("{}.{}.{}", filepath, test_id, "strassen_cpu");
+            mat_compare_or_fail(test_name.c_str(), matc_computed_strassen, matc_expected, mata, matb, mat_op::mul);
+        }
+
+        if (run_opencl) {
+            /* Test using opencl kernel */
+            timer.start();
+            mat_f32_t matc_computed_cl = mat_mul_cl(mata, matb);
+            timer.stop();
+
+            dur_cl += timer.get_duration();
+
+            TEST_ASSERT(matc_expected.width == matc_computed_cl.width);
+            TEST_ASSERT(matc_expected.height == matc_computed_cl.height);
+
+            test_name = fmt::format("{}.{}.{}", filepath, test_id, "cl");
+            mat_compare_or_fail(test_name.c_str(), matc_computed_cl, matc_expected, mata, matb, mat_op::mul);
         }
     }
+
+
+    /*
+     * Compute averages
+     */
+
+    const auto num_runs = ttrips.size();
+    constexpr u32 align = 36u;
+
+    if (dur_cpu.count())
+        benchinfo.add(fmt::format("{: <{}}cpu_f32", filename, align), dur_cpu / num_runs);
+
+    if (dur_strassen_cpu.count())
+        benchinfo.add(fmt::format("{: <{}}strassen_cpu_f32", filename, align), dur_strassen_cpu / num_runs);
+
+    if (dur_cl.count())
+        benchinfo.add(fmt::format("{: <{}}opencl_f32", filename, align), dur_cl / num_runs);
 }
