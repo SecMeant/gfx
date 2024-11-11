@@ -36,3 +36,21 @@ EXTERN_C int run_kernel_cu(
     cuda_kernel_variant variant
 );
 
+EXTERN_C int run_kernel_cu_f32(
+    f32 *h_lhs,
+    u32  h_lhs_cols,
+    u32  h_lhs_rows,
+    u32  h_lhs_stride,
+
+    f32 *h_rhs,
+    u32  h_rhs_cols,
+    u32  h_rhs_rows,
+    u32  h_rhs_stride,
+
+    f32 *h_out,
+    u32  h_out_cols,
+    u32  h_out_rows,
+    u32  h_out_stride,
+
+    cuda_kernel_variant variant
+);

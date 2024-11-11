@@ -81,6 +81,11 @@ EXTERN_C int matmul_cu_init(bool verbose)
     return 0;
 }
 
+
+/****************************************************************************
+ * I64 Kernels
+ ****************************************************************************/
+
 /*
  * We assume all matrcies are square and have the same dimensions.
  */
@@ -492,3 +497,418 @@ EXTERN_C int run_kernel_cu(
     __builtin_unreachable();
 }
 
+
+/****************************************************************************
+ * F32 Kernels
+ ****************************************************************************/
+
+/*
+ * We assume all matrcies are square and have the same dimensions.
+ */
+__global__ void kernel_matmul_cu_f32(
+    const f32 *lhs,
+    const f32 *rhs,
+          f32 *out,
+    const u32  dim,
+    const u32  lhs_stride,
+    const u32  rhs_stride,
+    const u32  out_stride
+) {
+        const u32 x = threadIdx.x + blockDim.x * blockIdx.x;
+        const u32 y = threadIdx.y + blockDim.y * blockIdx.y;
+
+        const bool out_of_bounds = x >= dim | y >= dim;
+        if (out_of_bounds)
+            return;
+
+        out[x + y*out_stride] = 0;
+
+        for (u32 i = 0; i < dim; ++i)
+            out[x + y*out_stride] += lhs[i + y*lhs_stride] * rhs[x + i*rhs_stride];
+}
+
+/*
+ * We assume all matrcies are square and have the same dimensions.
+ */
+__global__ void kernel_matmul_tiled_cu_f32(
+    const f32 *lhs,
+    const f32 *rhs,
+          f32 *out,
+    const u32  dim,
+    const u32  lhs_stride,
+    const u32  rhs_stride,
+    const u32  out_stride
+) {
+    constexpr u32 TILE_SIZE = 32 * 32;
+
+    __shared__ f32 tilea[TILE_SIZE];
+    __shared__ f32 tileb[TILE_SIZE];
+    __shared__ f32 tilec[TILE_SIZE];
+
+    /* Global coordinates for this thread. */
+    const u32 gx = threadIdx.x + blockIdx.x * blockDim.x;
+    const u32 gy = threadIdx.y + blockIdx.y * blockDim.y;
+
+    const bool out_of_bounds = gx >= dim | gy >= dim;
+    if (out_of_bounds)
+        return;
+
+    /* Local tile coordinates for this thread. */
+    const u32 tx      = threadIdx.x;
+    const u32 ty      = threadIdx.y;
+    const u32 tstride = blockDim.x;
+
+    tilec[tx + ty * tstride] = 0;
+
+    /*
+     * Row is a loop invariant for tilea.
+     * Column is a loop invariant for tileb.
+     */
+    for (int j = 0; j < dim; j += blockDim.x) {
+
+        /*
+         * Load lhs and rhs tiles into shared memory.
+         * Each thread loads one element.
+         */
+        tilea[tx + ty * tstride] = lhs[(tx+j) + gy * lhs_stride];
+        tileb[tx + ty * tstride] = rhs[gx + (ty+j) * rhs_stride];
+
+        /* Make sure tilea and tileb are populated. */
+        __syncthreads();
+
+        /* Accumulate results for current tile. */
+        for (u32 i = 0; i < blockDim.x; ++i)
+            tilec[tx + ty * tstride] += tilea[i + ty * tstride] * tileb[tx + i * tstride];
+
+        /* Make sure we don't modify tilea and tileb before all threads are finihsed with per tile computation */
+        __syncthreads();
+    }
+
+    out[gx + gy * out_stride] = tilec[tx + ty * tstride];
+}
+
+/*
+ * We assume all matrcies are square and have the same dimensions.
+ */
+__global__ void kernel_matmul_test_cu_f32(
+    const f32 *lhs,
+    const f32 *rhs,
+          f32 *out_,
+    const u32  dim,
+    const u32  lhs_stride,
+    const u32  rhs_stride,
+    const u32  out_stride
+) {
+    /* Global coordinates for this thread. */
+    const u32 gx = blockIdx.z + blockIdx.x * blockDim.x;
+    const u32 gy = blockIdx.z + blockIdx.y * blockDim.y;
+
+    const bool out_of_bounds = gx >= dim | gy >= dim;
+    if (out_of_bounds)
+        return;
+
+    u32 out = 0;
+
+    for (u32 i = 0; i < dim; ++i)
+        out += lhs[i + gy * lhs_stride] * rhs[gx + i * rhs_stride];
+
+    out_[gx + gy * out_stride] = out;
+}
+
+static int run_kernel_cu_umem_f32_(
+    const f32 *h_lhs,
+    const f32 *h_rhs,
+          f32 *h_out,
+    const u32  dim,
+    const u32  lhs_stride,
+    const u32  rhs_stride,
+    const u32  out_stride
+) {
+          f32 *u_lhs;
+    const u32  lhs_size = dim * lhs_stride * sizeof(*u_lhs);
+
+          f32 *u_rhs;
+    const u32  rhs_size = dim * rhs_stride * sizeof(*u_rhs);
+
+          f32 *u_out;
+    const u32  out_size = dim * out_stride * sizeof(*u_out);
+
+    checkCudaError(cudaMallocManaged(&u_lhs, lhs_size));
+    checkCudaError(cudaMallocManaged(&u_rhs, rhs_size));
+    checkCudaError(cudaMallocManaged(&u_out, out_size));
+
+    memcpy(u_lhs, h_lhs, lhs_size);
+    memcpy(u_rhs, h_rhs, rhs_size);
+
+    /* We assume block dim to be 32 */
+    const u32 num_threads = std::min(dim, 32u);
+    const dim3 block_dims(num_threads, num_threads);
+
+    const u32 num_blocks = (dim + 31u) / 32u;
+    const dim3 grid_dims(num_blocks, num_blocks);
+
+    kernel_matmul_cu_f32<<<grid_dims, block_dims>>>(
+        u_lhs,
+        u_rhs,
+        u_out,
+        dim,
+        lhs_stride,
+        rhs_stride,
+        out_stride
+    );
+    cudaDeviceSynchronize();
+
+    memcpy(h_out, u_out, out_size);
+
+    cudaFree(u_out);
+    cudaFree(u_rhs);
+    cudaFree(u_lhs);
+
+    checkCudaError(cudaGetLastError());
+
+    return 0;
+}
+
+static int run_kernel_cu_umem_tiled_f32_(
+    const f32 *h_lhs,
+    const f32 *h_rhs,
+          f32 *h_out,
+    const u32  dim,
+    const u32  lhs_stride,
+    const u32  rhs_stride,
+    const u32  out_stride
+) {
+          f32 *u_lhs;
+    const u32  lhs_size = dim * lhs_stride * sizeof(*u_lhs);
+
+          f32 *u_rhs;
+    const u32  rhs_size = dim * rhs_stride * sizeof(*u_rhs);
+
+          f32 *u_out;
+    const u32  out_size = dim * out_stride * sizeof(*u_out);
+
+    checkCudaError(cudaMallocManaged(&u_lhs, lhs_size));
+    checkCudaError(cudaMallocManaged(&u_rhs, rhs_size));
+    checkCudaError(cudaMallocManaged(&u_out, out_size));
+
+    memcpy(u_lhs, h_lhs, lhs_size);
+    memcpy(u_rhs, h_rhs, rhs_size);
+
+    /* We assume block dim to be 32 */
+    const u32 num_threads = std::min(dim, 32u);
+    const dim3 block_dims(num_threads, num_threads);
+
+    const u32 num_blocks = (dim + num_threads - 1) / num_threads;
+    const dim3 grid_dims(num_blocks, num_blocks);
+
+    kernel_matmul_tiled_cu_f32<<<grid_dims, block_dims>>>(
+        u_lhs,
+        u_rhs,
+        u_out,
+        dim,
+        lhs_stride,
+        rhs_stride,
+        out_stride
+    );
+    cudaDeviceSynchronize();
+
+    memcpy(h_out, u_out, out_size);
+
+    cudaFree(u_out);
+    cudaFree(u_rhs);
+    cudaFree(u_lhs);
+
+    checkCudaError(cudaGetLastError());
+
+    return 0;
+}
+
+static int run_kernel_cu_tiled_f32_(
+    const f32 *h_lhs,
+    const f32 *h_rhs,
+          f32 *h_out,
+    const u32  dim,
+    const u32  lhs_stride,
+    const u32  rhs_stride,
+    const u32  out_stride
+) {
+          f32 *d_lhs;
+    const u32  lhs_size = dim * lhs_stride * sizeof(*d_lhs);
+
+          f32 *d_rhs;
+    const u32  rhs_size = dim * rhs_stride * sizeof(*d_rhs);
+
+          f32 *d_out;
+    const u32  out_size = dim * out_stride * sizeof(*d_out);
+
+    checkCudaError(cudaMalloc(&d_lhs, lhs_size));
+    checkCudaError(cudaMalloc(&d_rhs, rhs_size));
+    checkCudaError(cudaMalloc(&d_out, out_size));
+
+    checkCudaError(cudaMemcpy(d_lhs, h_lhs, lhs_size, cudaMemcpyHostToDevice));
+    checkCudaError(cudaMemcpy(d_rhs, h_rhs, rhs_size, cudaMemcpyHostToDevice));
+
+    /* We assume block dim to be 32 */
+    const u32 num_threads = std::min(dim, 32u);
+    const dim3 block_dims(num_threads, num_threads);
+
+    const u32 num_blocks = (dim + num_threads - 1) / num_threads;
+    const dim3 grid_dims(num_blocks, num_blocks);
+
+    kernel_matmul_tiled_cu_f32<<<grid_dims, block_dims>>>(
+        d_lhs,
+        d_rhs,
+        d_out,
+        dim,
+        lhs_stride,
+        rhs_stride,
+        out_stride
+    );
+    cudaDeviceSynchronize();
+
+    checkCudaError(cudaMemcpy(h_out, d_out, out_size, cudaMemcpyDeviceToHost));
+
+    cudaFree(d_out);
+    cudaFree(d_rhs);
+    cudaFree(d_lhs);
+
+    checkCudaError(cudaGetLastError());
+
+    return 0;
+}
+
+static int run_kernel_cu_test_f32_(
+    const f32 *h_lhs,
+    const f32 *h_rhs,
+          f32 *h_out,
+    const u32  dim,
+    const u32  lhs_stride,
+    const u32  rhs_stride,
+    const u32  out_stride
+) {
+          f32 *u_lhs;
+    const u32  lhs_size = dim * lhs_stride * sizeof(*u_lhs);
+
+          f32 *u_rhs;
+    const u32  rhs_size = dim * rhs_stride * sizeof(*u_rhs);
+
+          f32 *u_out;
+    const u32  out_size = dim * out_stride * sizeof(*u_out);
+
+    checkCudaError(cudaMallocManaged(&u_lhs, lhs_size));
+    checkCudaError(cudaMallocManaged(&u_rhs, rhs_size));
+    checkCudaError(cudaMallocManaged(&u_out, out_size));
+
+    memcpy(u_lhs, h_lhs, lhs_size);
+    memcpy(u_rhs, h_rhs, rhs_size);
+
+    const u32 num_threads = 32;
+    const dim3 block_dims(num_threads, num_threads);
+
+    const u32 num_blocks = (dim + num_threads - 1) / num_threads;
+    const dim3 grid_dims(num_blocks, num_blocks);
+
+    kernel_matmul_cu_f32<<<grid_dims, block_dims>>>(
+        u_lhs,
+        u_rhs,
+        u_out,
+        dim,
+        lhs_stride,
+        rhs_stride,
+        out_stride
+    );
+    cudaDeviceSynchronize();
+
+    memcpy(h_out, u_out, out_size);
+
+    cudaFree(u_out);
+    cudaFree(u_rhs);
+    cudaFree(u_lhs);
+
+    checkCudaError(cudaGetLastError());
+
+    return 0;
+}
+
+EXTERN_C int run_kernel_cu_f32(
+          f32 *h_lhs,
+    const u32  lhs_cols,
+    const u32  lhs_rows,
+    const u32  lhs_stride,
+
+          f32 *h_rhs,
+    const u32  rhs_cols,
+    const u32  rhs_rows,
+    const u32  rhs_stride,
+
+          f32 *h_out,
+    const u32  out_cols,
+    const u32  out_rows,
+    const u32  out_stride,
+
+    cuda_kernel_variant variant
+) {
+    static std::atomic<u32> printed(0);
+
+    assert(lhs_cols == lhs_rows);
+    assert(rhs_cols == rhs_rows);
+    assert(out_cols == out_rows);
+    assert(lhs_cols == rhs_cols);
+    assert(lhs_cols == out_cols);
+
+    if (printed.fetch_or(1, std::memory_order_relaxed) == 0 &&
+        strcmp(current_dev().name, "NVIDIA GeForce GTX 970")) {
+        fprintf(stderr, CLR_YELLOW "WARN: %s: kernel written for %s, but current device is %s.\n" CLR_RESET,
+                __func__, "NVIDIA GeForce GTX 970", current_dev().name);
+    }
+
+    std::unique_lock lck(kernel_exec_mtx);
+
+    switch (variant) {
+    case cuda_kernel_variant::UMEM:
+        return run_kernel_cu_umem_f32_(
+            h_lhs,
+            h_rhs,
+            h_out,
+            lhs_cols,
+            lhs_stride,
+            rhs_stride,
+            out_stride
+        );
+
+    case cuda_kernel_variant::UMEM_TILED:
+        return run_kernel_cu_umem_tiled_f32_(
+            h_lhs,
+            h_rhs,
+            h_out,
+            lhs_cols,
+            lhs_stride,
+            rhs_stride,
+            out_stride
+        );
+
+    case cuda_kernel_variant::TILED:
+        return run_kernel_cu_tiled_f32_(
+            h_lhs,
+            h_rhs,
+            h_out,
+            lhs_cols,
+            lhs_stride,
+            rhs_stride,
+            out_stride
+        );
+
+    case cuda_kernel_variant::TEST:
+        return run_kernel_cu_test_f32_(
+            h_lhs,
+            h_rhs,
+            h_out,
+            lhs_cols,
+            lhs_stride,
+            rhs_stride,
+            out_stride
+        );
+    }
+
+    __builtin_unreachable();
+}
