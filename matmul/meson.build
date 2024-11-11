@@ -1,4 +1,8 @@
-project('matmul', ['cpp', 'cuda'])
+project(
+  'matmul',
+  ['cpp', 'cuda'],
+  meson_version: '>=1.1'
+)
 
 conf = configuration_data()
 summary_info = {}
