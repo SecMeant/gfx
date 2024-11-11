@@ -13,7 +13,7 @@ rapidjson = dependency('RapidJSON', required: true)
 opencl = dependency('OpenCL', required: true)
 cuda = dependency('cuda', required: true)
 
-test_files_path = meson.source_root() + '/tests/files/'
+test_files_path = meson.project_source_root() + '/tests/files/'
 
 cpp_args_common = [
   '-std=c++23',
@@ -36,7 +36,7 @@ cuda_args = [
   '--optimize', '3',
 ]
 
-conf.set_quoted('CONFIG_CL_MATMUL_KERNEL_SRC', meson.source_root() / 'matmul.cl')
+conf.set_quoted('CONFIG_CL_MATMUL_KERNEL_SRC', meson.project_source_root() / 'matmul.cl')
 
 foreach key : conf.keys()
   summary_info += {key: conf.get(key)}
