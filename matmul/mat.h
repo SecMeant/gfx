@@ -181,14 +181,14 @@ struct matview_base_t {
     matview_base_t& operator=(const matview_base_t &other) = default;
     matview_base_t& operator=(matview_base_t &&other) = default;
 
-    matview_base_t(const ParentType &m)
+    constexpr matview_base_t(const ParentType &m)
     :data(m.data.get())
     ,width(m.width)
     ,height(m.height)
     ,stride(m.stride)
     {}
 
-    matview_base_t(ValuePtr data, u32 width, u32 height, u32 stride)
+    constexpr matview_base_t(ValuePtr data, u32 width, u32 height, u32 stride)
     :data(data)
     ,width(width)
     ,height(height)
@@ -250,7 +250,7 @@ template<> struct matview_base_t<void> {
     ,type(t)
     {}
 
-    constexpr matview_base_t(mat_i64_t &m)
+    matview_base_t(mat_i64_t &m)
     :data(m.data.get())
     ,width(m.width)
     ,height(m.height)
@@ -266,7 +266,7 @@ template<> struct matview_base_t<void> {
     ,type(mat_type_e::i64)
     {}
 
-    constexpr matview_base_t(mat_f32_t &m)
+    matview_base_t(mat_f32_t &m)
     :data(m.data.get())
     ,width(m.width)
     ,height(m.height)
