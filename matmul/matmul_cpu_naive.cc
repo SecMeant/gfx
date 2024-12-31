@@ -41,12 +41,11 @@ template <typename MatrixType, typename ViewType>
 MatrixType mat_mul_cpu_(ViewType lhs, ViewType rhs)
 {
     assert(lhs.width == rhs.height);
-    assert(lhs.height == rhs.width);
 
-    MatrixType out = MatrixType::make_matrix_zero(lhs.height, rhs.width);
+    MatrixType out = MatrixType::make_matrix_zero(rhs.width, lhs.height);
 
-    for (u32 y = 0; y < lhs.height; ++y)
-        for (u32 x = 0; x < lhs.width; ++x)
+    for (u32 y = 0; y < out.height; ++y)
+        for (u32 x = 0; x < out.width; ++x)
             for (u32 i = 0; i < lhs.width; ++i)
                 out[x,y] += lhs[i,y] * rhs[x,i];
 
