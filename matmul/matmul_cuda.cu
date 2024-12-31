@@ -12,6 +12,8 @@
 #include "types.h"
 #include "matmul_cuda.h"
 
+#include "print_utils.h"
+
 #define checkCudaError(err) \
 ({ \
     __typeof__(err) _err = (err); \
@@ -913,3 +915,320 @@ EXTERN_C int run_kernel_cu_f32(
 
     __builtin_unreachable();
 }
+
+struct matrix {
+    constexpr static u32 STRIDE_AUTO = 0;
+
+    enum class grad_t {
+        no_grad,
+        with_grad,
+    };
+
+    void free()
+    {
+        if (this->data)
+            cudaFree(this->data);
+
+        if (this->grad)
+            cudaFree(this->grad);
+
+        this->data = nullptr;
+        this->grad = nullptr;
+        this->width = 0;
+        this->height = 0;
+        this->stride = 0;
+    }
+
+    cudaError_t alloc_on_device(u32 width, u32 height, u32 stride, grad_t grad_opt)
+    {
+        this->free();
+
+        if (stride == STRIDE_AUTO)
+            stride = width;
+
+        assert(width <= stride);
+
+        auto err = cudaMalloc(&this->data, sizeof(*this->data) * height * stride);
+        if (err != cudaSuccess)
+            return err;
+
+        if (grad_opt == grad_t::with_grad) {
+            err = cudaMalloc(&this->grad, sizeof(*this->grad) * height * stride);
+            if (err != cudaSuccess) {
+                cudaFree(this->data);
+                this->data = nullptr;
+                return err;
+            }
+        }
+
+        this->width = width;
+        this->height = height;
+        this->stride = stride;
+
+        return cudaSuccess;
+    }
+
+    u64 size_bytes() const
+    {
+        return this->height * this->stride * sizeof(*this->data);
+    }
+
+    f32 *data = nullptr;
+    f32 *grad = nullptr;
+    u32  width = 0;
+    u32  height = 0;
+    u32  stride = 0;
+};
+
+constexpr static auto STRIDE_AUTO = matrix::STRIDE_AUTO;
+
+constexpr static auto no_grad   = matrix::grad_t::no_grad;
+constexpr static auto with_grad = matrix::grad_t::with_grad;
+
+/*
+ * Computes:
+ *     out = lhs @ rhs
+ *
+ *  Assumes 'lhs', 'rhs' and 'out' are correctly sized.
+ */
+__global__ void kernel_matmul(
+    struct matrix lhs,
+    struct matrix rhs,
+    struct matrix out
+) {
+    const u32 gx = threadIdx.x + blockIdx.x * blockDim.x;
+    const u32 gy = threadIdx.y + blockIdx.y * blockDim.y;
+
+    const bool out_of_bounds = (gx >= out.width) | (gy >= out.height);
+    if (out_of_bounds)
+        return;
+
+    f32 v = 0;
+    for (u32 i = 0; i < lhs.width; ++i)
+        v += lhs.data[i + gy * lhs.stride] * rhs.data[gx + i * rhs.stride];
+    out.data[gx + gy * out.stride] = v;
+}
+
+__global__ void kernel_mse(
+    struct matrix lhs,
+    struct matrix rhs,
+    struct matrix out_mse,
+    f32 *out_mse_v
+){
+    const u32 gx = threadIdx.x + blockIdx.x * blockDim.x;
+    const u32 gy = threadIdx.y + blockIdx.y * blockDim.y;
+
+    const bool out_of_bounds = (gx >= out_mse.width) | (gy >= out_mse.height);
+    if (out_of_bounds)
+        return;
+
+    /*
+     * Compute:
+     *     data = (lhs - rhs) ** 2
+     *     grad = 2 * (lhs - rhs)
+     */
+    f32 mse = lhs.data[gx + gy * lhs.stride] - rhs.data[gx + gy * rhs.stride];
+    out_mse.grad[gx + gy * out_mse.stride] = mse;
+    out_mse.data[gx + gy * out_mse.stride] = mse * mse;
+
+    __syncthreads();
+
+    /*
+     * From now on we execute:
+     *     num_vectors = lhs.width = rhs.width
+     *     x: [0; num_vectors]
+     *     y: 0
+     *
+     *  IOW reduce across columns.
+     */
+    if (gy != 0)
+        return;
+
+    f32 mse_v = 0;
+    for (u32 y = 0; y < out_mse.height; ++y)
+        mse_v += out_mse.data[gx + y * out_mse.stride];
+
+    *out_mse_v = mse_v;
+}
+
+__global__ void kernel_grad_cu_forward(
+    struct matrix xs,
+    struct matrix ys,
+    struct matrix ypred,
+    struct matrix w,
+    struct matrix loss0,
+    struct matrix loss1,
+    f32 *out_loss_v
+){
+    const u32 gx = threadIdx.x;
+    const u32 gy = threadIdx.y;
+
+    const bool out_of_bounds = (gx >= ypred.width) | (gy >= ypred.height);
+
+    if (out_of_bounds)
+        return;
+
+    __syncthreads();
+
+    if (gx != 0 | gy != 0)
+        return;
+
+    f32 loss_v = 0;
+    for (u32 i = 0; i < loss1.height; ++i)
+        loss_v += loss1.data[gx + i * loss1.stride];
+
+    *out_loss_v = loss_v;
+}
+
+__global__ void kernel_grad_reset(struct matrix m)
+{
+    const u32 gx = threadIdx.x;
+    const u32 gy = threadIdx.y;
+
+    const bool out_of_bounds = (gx >= m.width) | (gy >= m.height);
+    if (out_of_bounds)
+        return;
+
+    m.grad[gx + gy * m.stride] = 1.0f;
+}
+
+__global__ void kernel_backward_x_squared(
+    struct matrix cur,
+    struct matrix prev
+) {
+    const u32 gx = threadIdx.x;
+    const u32 gy = threadIdx.y;
+
+    const bool out_of_bounds = (gx >= cur.width) | (gy >= cur.height);
+    if (out_of_bounds)
+        return;
+
+    prev.grad[gx + gy * prev.stride] *= 2*cur.grad[gx + gy * cur.stride];
+}
+
+__global__ void kernel_grad_cu_backward(
+    struct matrix xs,
+    struct matrix w,
+    struct matrix loss
+){
+    const f32 lr = 1e-6f;
+
+    const u32 gx = threadIdx.x;
+    const u32 gy = threadIdx.y;
+
+    const bool out_of_bounds = (gx >= w.width) | (gy >= w.height);
+    if (out_of_bounds)
+        return;
+
+    w.grad[gx + gy * w.stride] = 2*loss.grad[0 + gy * loss.stride] * xs.data[0 + gx * xs.stride];
+    w.data[gx + gy * w.stride] -= w.grad[gx + gy * w.stride] * lr;
+}
+
+EXTERN_C void run_kernel_cu_grad_f32(
+    matview_f32_t h_xs,
+    matview_f32_t h_ygt,
+    mat_f32_t &h_weights,
+    f32 &out_loss
+) {
+    assert(h_xs.width == h_ygt.width);
+    assert(h_xs.height == h_ygt.height);
+    assert(h_xs.width == 1);
+    assert(h_ygt.width == 1);
+
+    struct matrix d_xs, d_ygt, d_ypred, d_weights, d_loss;
+    f32 *d_lossv;
+    const u32 num_neurons = h_xs.height;
+
+    checkCudaError(d_xs.alloc_on_device(h_xs.width, h_xs.height, h_xs.stride, no_grad));
+    checkCudaError(d_ygt.alloc_on_device(d_ygt.width, h_ygt.height, h_ygt.stride, no_grad));
+    checkCudaError(d_ypred.alloc_on_device(h_ygt.width, h_ygt.height, h_ygt.stride, no_grad));
+    checkCudaError(d_weights.alloc_on_device(h_xs.height, num_neurons, STRIDE_AUTO, with_grad));
+    checkCudaError(d_loss.alloc_on_device(d_ypred.width, d_ypred.height, d_ypred.stride, with_grad));
+    checkCudaError(cudaMalloc(&d_lossv, sizeof(*d_lossv)));
+
+    mat_f32_t h_grad = mat_f32_t::make_matrix_zero(d_weights.width, d_weights.height, d_weights.stride);
+    h_weights = mat_f32_t::make_matrix_zero(d_weights.width, d_weights.height, d_weights.stride);
+
+    assert(d_xs.stride == h_xs.stride);
+    assert(d_xs.size_bytes() == h_xs.size_bytes());
+    checkCudaError(cudaMemcpy(d_xs.data, h_xs.data, d_xs.size_bytes(), cudaMemcpyHostToDevice));
+
+    assert(d_ygt.stride == h_ygt.stride);
+    assert(d_ygt.size_bytes() == h_ygt.size_bytes());
+    checkCudaError(cudaMemcpy(d_ygt.data, h_ygt.data, d_ygt.size_bytes(), cudaMemcpyHostToDevice));
+
+    assert(d_weights.size_bytes() == h_weights.size_bytes());
+    checkCudaError(cudaMemcpy(d_weights.data, h_weights.data.get(), d_weights.size_bytes(), cudaMemcpyHostToDevice));
+
+
+    const u32 num_threads = 32;
+    const dim3 block_dims(num_threads, num_threads);
+
+    const u32 num_blocks = 1;
+    const dim3 grid_dims(num_blocks, num_blocks);
+
+    constexpr f32 LOSS_TARGET = 1e-5f;
+    u32 epoch = 0;
+    while(1) {
+
+        /*
+         * Forward pass
+         */
+        kernel_matmul<<<grid_dims, block_dims>>>(
+            d_weights,
+            d_xs,
+            d_ypred
+        );
+
+        kernel_mse<<<grid_dims, block_dims>>>(
+            d_ypred,
+            d_ygt,
+            d_loss,
+            d_lossv
+        );
+
+        checkCudaError(cudaMemcpy(&out_loss, d_lossv, sizeof(f32), cudaMemcpyDeviceToHost));
+
+        kernel_grad_cu_backward<<<grid_dims, block_dims>>>(
+            d_xs,
+            d_weights,
+            d_loss
+        );
+
+        checkCudaError(cudaMemcpy(h_grad.data.get(), d_weights.grad, d_weights.size_bytes(),
+                                  cudaMemcpyDeviceToHost));
+
+        /* Copy trained weights back to the caller. */
+        checkCudaError(cudaMemcpy(h_weights.data.get(), d_weights.data, d_weights.size_bytes(),
+                                  cudaMemcpyDeviceToHost));
+
+        /* Copy loss back to the caller. */
+        checkCudaError(cudaMemcpy(&out_loss, d_lossv, sizeof(f32),
+                                  cudaMemcpyDeviceToHost));
+
+        if (++epoch % 1024 == 0 || out_loss <= LOSS_TARGET) {
+            puts("grad");
+            print_mat(h_grad);
+
+            puts("weights");
+            print_mat(h_weights);
+
+            auto ypred = mat_mul_cpu(h_weights, h_xs);
+            puts("ypred");
+            print_mat(ypred);
+
+            printf("loss: %f\n", out_loss);
+        }
+
+        if (out_loss <= LOSS_TARGET)
+            break;
+    }
+
+    cudaFree(d_lossv);
+    d_loss.free();
+    d_weights.free();
+    d_ypred.free();
+    d_ygt.free();
+    d_xs.free();
+}
+

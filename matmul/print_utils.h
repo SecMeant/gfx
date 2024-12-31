@@ -20,7 +20,7 @@ inline void print_mat(matview_base_t<ParentType> mv)
 
         putchar('{');
         for (u32 x = 0; x < mv.width; ++x) {
-            printf(print_mat_format<decltype(mv)>, mv[x,y]);
+            printf(print_mat_format<decltype(mv)>, mv.at(x,y));
         }
         putchar('}');
         putchar(',');

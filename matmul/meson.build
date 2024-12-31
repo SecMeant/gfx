@@ -14,6 +14,7 @@ opencl = dependency('OpenCL', required: true)
 cuda = dependency('cuda', required: true)
 
 test_files_path = meson.project_source_root() + '/tests/files/'
+grad_file_path  = meson.project_source_root() + '/tests/files/grad.safetensors'
 
 cpp_args_common = [
   '-std=c++23',
@@ -97,6 +98,7 @@ executable(
   cpp_args: [
     cpp_args_common,
     '-DCONFIG_TEST_FILES_PATH="' + test_files_path + '"',
+    '-DCONFIG_GRAD_FILE_PATH="' + grad_file_path + '"',
   ],
   link_with: libmatmul,
   include_directories: ['../']

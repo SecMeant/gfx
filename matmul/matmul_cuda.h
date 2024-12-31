@@ -1,5 +1,6 @@
 #pragma once
 
+#include "mat.h"
 #include "types.h"
 
 #if defined(__cplusplus)
@@ -54,3 +55,6 @@ EXTERN_C int run_kernel_cu_f32(
 
     cuda_kernel_variant variant
 );
+
+EXTERN_C void run_kernel_cu_grad_f32(matview_f32_t h_x, matview_f32_t h_ygt, mat_f32_t &h_out, f32 &out_loss);
+
