@@ -34,7 +34,7 @@ import torch
 from safetensors.torch import load_file, save_file
 
 if args.type == 'i32':
-    dtype = torch.i32
+    dtype = torch.int32
 elif args.type == 'f32':
     dtype = torch.float32
 
