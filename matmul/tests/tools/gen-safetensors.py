@@ -18,7 +18,7 @@ parser.add_argument(
 
 args = parser.parse_args()
 
-tools_path = path.join(path.dirname(path.abspath(__file__)), 'tools')
+tools_path = path.normpath(path.dirname(__file__))
 makedirs(args.outdir, exist_ok = True)
 
 #
