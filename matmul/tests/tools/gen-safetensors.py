@@ -49,7 +49,7 @@ run_program(program_args)
 valrange = (-16, 16)
 dim = (4,1)
 program_args = [
-    path.join(tools_path, 'torch_gen_grad_safetensors.py'),
+    path.join(tools_path, 'torch-gen-grad-safetensors.py'),
     '-o', path.join(args.outdir, 'grad.safetensors'),
 
     # Ugly hack is needed for arg to be ' dim,dim' and ' valrange,valrange',
@@ -78,7 +78,7 @@ for dt in datatypes:
             dt_str = '_f32'
 
         program_args = [
-            path.join(tools_path, 'torch_gen_safetensors.py'),
+            path.join(tools_path, 'torch-gen-safetensors.py'),
             '-o', path.join(args.outdir, f'{prefix}{dim}x{dim}{dt_str}{suffix}'),
             '-d', f'{dim}',
             '-v', f'{valrange[0]},{valrange[1]}',
