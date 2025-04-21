@@ -34,3 +34,10 @@ inline void print_mat(const mat_base_t<ValueType> &m)
 {
     print_mat(matview_base_t(m));
 }
+
+template <typename ValueType>
+inline void print_mat(const char *topic, const mat_base_t<ValueType> &m)
+{
+    puts(topic);
+    print_mat(m);
+}
