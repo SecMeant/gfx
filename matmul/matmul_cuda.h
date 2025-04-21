@@ -57,4 +57,5 @@ EXTERN_C int run_kernel_cu_f32(
 );
 
 EXTERN_C void run_kernel_cu_grad_f32(matview_f32_t h_x, matview_f32_t h_ygt, mat_f32_t &h_out, f32 &out_loss);
+EXTERN_C void train_cu_classify(matview_f32_t h_x, matview_f32_t h_ygt, std::array<mat_f32_t, 3> &h_out, f32 &out_loss);
 

@@ -15,6 +15,7 @@ cuda = dependency('cuda', required: true)
 
 test_files_path = meson.project_source_root() + '/tests/files/'
 grad_file_path  = meson.project_source_root() + '/tests/files/grad.safetensors'
+classify_file_path  = meson.project_source_root() + '/tests/files/classify.safetensors'
 
 cpp_args_common = [
   '-std=c++23',
@@ -35,6 +36,7 @@ cpp_args_common = [
 cuda_args = [
   '--dopt=on',
   '--optimize', '3',
+  '-Wno-deprecated-gpu-targets',
 ]
 
 conf.set_quoted('CONFIG_CL_MATMUL_KERNEL_SRC', meson.project_source_root() / 'matmul.cl')
@@ -99,6 +101,7 @@ executable(
     cpp_args_common,
     '-DCONFIG_TEST_FILES_PATH="' + test_files_path + '"',
     '-DCONFIG_GRAD_FILE_PATH="' + grad_file_path + '"',
+    '-DCONFIG_CLASSIFY_FILE_PATH="' + classify_file_path + '"',
   ],
   link_with: libmatmul,
   include_directories: ['../']

@@ -1,6 +1,7 @@
 #include <thread>
 #include <vector>
 #include <queue>
+#include <cmath>
 #include <condition_variable>
 #include <unistd.h>
 
@@ -772,6 +773,182 @@ int run_gradient_descent()
     return 0;
 }
 
+int run_classify()
+{
+    /*
+     * Parse safetensors file
+     */
+    auto ftensors = mipc::finbuf(CONFIG_CLASSIFY_FILE_PATH);
+    if (!ftensors) {
+        fprintf(stderr, "Error: failed to open %s\n", CONFIG_GRAD_FILE_PATH);
+        return 1;
+    }
+
+    const char *begin = ftensors.begin();
+
+    u64 metadata_size = 0;
+    std::memcpy(&metadata_size, begin, sizeof(u64));
+
+    begin += sizeof(u64);
+
+    std::string header_str;
+    header_str.assign(begin, metadata_size+1);
+    header_str[metadata_size] = '\0';
+
+    rapidjson::Document header_json;
+    header_json.Parse(header_str.c_str());
+    assert(header_json.IsObject());
+
+    struct safetensor_f32 {
+        // Shape
+        u32 rows = 0;
+        u32 cols = 0;
+
+        const f32* data = nullptr;
+    };
+
+    safetensor_f32 x, y;
+
+    for (auto &m: header_json.GetObject()) {
+
+        auto parse_tensor_data = [&] (safetensor_f32 &t) -> int {
+
+            /*
+             * Parse dtype
+             */
+            if (!m.value.HasMember("dtype")) {
+                fmt::print(stderr, "{}: Missing {} field\n", m.name.GetString(), "dtype");
+                return 1;
+            }
+
+            if (!m.value["dtype"].IsString()) {
+                fmt::print(stderr, "{}: Expected {} field to be of type {}\n",
+                        m.name.GetString(), "dtype", "string");
+                return 1;
+            }
+
+            if (strcmp(m.value["dtype"].GetString(), "F32") != 0) {
+                fmt::print(stderr, "{}: Expected {} field to be \"I32\", but got {}\n",
+                        m.name.GetString(), "dtype", m.value.GetString());
+                return 1;
+            }
+
+            /*
+             * Parse shape
+             */
+            if (!m.value.HasMember("shape")) {
+                fmt::print(stderr, "{}: Missing {} field\n", m.name.GetString(), "shape");
+                return 1;
+            }
+
+            if (!m.value["shape"].IsArray()) {
+                fmt::print(stderr, "{}: Expected {} field to be of type {}\n",
+                       m.name.GetString(), "shape", "array");
+                return 1;
+            }
+
+            if (m.value["shape"].GetArray().Size() == 0) {
+                fmt::print(stderr, "{}: Expected shape to be non-zero\n",
+                       m.name.GetString());
+                return 1;
+            }
+
+            t.rows = m.value["shape"].GetArray()[0].GetUint();
+
+            if (m.value["shape"].GetArray().Size() == 2)
+                t.cols = m.value["shape"].GetArray()[1].GetUint();
+            else
+                t.cols = 1;
+
+
+            /*
+             * Parse data
+             */
+            if (!m.value.HasMember("data_offsets")) {
+                fmt::print(stderr, "{}: Missing {} field\n", m.name.GetString(), "data_offsets");
+                return 1;
+            }
+
+            if (!m.value["data_offsets"].IsArray()) {
+                fmt::print(stderr, "{}: Expected {} field to be of type {}\n",
+                        m.name.GetString(), "data_offsets", "array");
+                return 1;
+            }
+
+            if (m.value["data_offsets"].GetArray().Size() != 2) {
+                fmt::print(stderr, "{}: Expected data_offsets to be array of size 2\n",
+                        m.name.GetString());
+                return 1;
+            }
+
+            t.data = rcast<const f32*>(
+                /* Get data offset as base. */
+                m.value["data_offsets"].GetArray()[0].GetUint64() +
+
+                /* Skip metadata size. */
+                sizeof(u64) +
+
+                /* Skip the actual metadata. */
+                metadata_size +
+
+                /* Finally, offset from base of mmaped file to obtain data pointer. */
+                ftensors.begin()
+            );
+
+            return 0;
+        };
+
+        if (strcmp(m.name.GetString(), "x") == 0) {
+
+            if (parse_tensor_data(x)) {
+                fprintf(stderr, "Failed to parse %s\n", "x");
+                return 1;
+            }
+
+            continue;
+        }
+
+        if (strcmp(m.name.GetString(), "y") == 0) {
+
+            if (parse_tensor_data(y)) {
+                fprintf(stderr, "Failed to parse %s\n", "y");
+                return 1;
+            }
+
+            continue;
+        }
+
+        fprintf(stderr, "Expected \"x\" or \"y\", got: \"%s\"\n", m.name.GetString());
+        return 1;
+    }
+
+    auto make_mat_from_tensor_data = [] (const safetensor_f32 &tensor) {
+        return mat_f32_t::make_matrix_from_data(tensor.data, tensor.cols, tensor.rows);
+    };
+
+    auto mat_x = make_mat_from_tensor_data(x),
+         mat_y = make_mat_from_tensor_data(y);
+
+#if 0
+    printf("xs: [%u;%u]\nys: [%u;%u]\n", mat_x.width, mat_x.height, mat_y.width, mat_y.height);
+    puts("xs");
+    print_mat(mat_x);
+
+    puts("ygt");
+    print_mat(mat_y);
+#endif
+
+    std::array<mat_f32_t, 3> hidden;
+    f32 loss = NAN;
+
+    train_cu_classify(mat_x, mat_y, hidden, loss);
+
+    printf("loss: %.2f\n", loss);
+
+    return 0;
+
+}
+
 int main(int argc, char **argv)
 {
     int ret = 0;
@@ -794,6 +971,7 @@ int main(int argc, char **argv)
                 "                        -ef32 | --enablef32 # Enables float32 tests\n"
                 "                        -ei64 | --enablei64 # Enables int64 tests\n"
                 "       --grad         Run only gradient descend test\n"
+                "       --class        Run only classify test\n"
             );
             return 0;
         }
@@ -834,10 +1012,18 @@ int main(int argc, char **argv)
             opt_grad = true;
             continue;
         }
+
+        if (strcmp(s, "--class") == 0) {
+            opt_classify = true;
+            continue;
+        }
     }
 
     if (opt_grad)
         return run_gradient_descent();
+
+    if (opt_classify)
+        return run_classify();
 
     if (explicit_enable) {
         opt_enable_i64 = explicit_enable_i64;
