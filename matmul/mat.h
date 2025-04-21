@@ -110,6 +110,56 @@ struct mat_base_t {
         return ret;
     }
 
+    static bool has_fractional_part(const ValueType v)
+    {
+        if constexpr (std::is_floating_point_v<ValueType>)
+            return false;
+
+        ValueType dummy;
+        modf(v, &dummy);
+
+        return v == 0.0f || v == -0.0f;
+    }
+
+    static mat_base_t make_matrix_in_range(
+        const u32 width,
+        const u32 height,
+        u32 stride,
+        ValueType low,
+        ValueType high
+    ) {
+        if (stride == 0)
+            stride = gen_stride(width);
+
+        mat_base_t ret = make_matrix(width, height, stride);
+
+        for (u32 y = 0; y < height; ++y) {
+            for (u32 x = 0; x < stride; ++x) {
+                ValueType *p = &ret.data.get()[x + y * ret.stride];
+
+                if (x >= width) {
+                    *p = 0;
+                    continue;
+                }
+
+                assert(high > low);
+                assert(!has_fractional_part(high));
+                assert(!has_fractional_part(low));
+
+                const auto rand_gap = static_cast<int>(high - low);
+
+                if constexpr (std::is_floating_point_v<ValueType>) {
+                    const auto rand_0_1 = static_cast<ValueType>(rand() % 1024) / static_cast<ValueType>(1024.0f);
+                    *p = (rand_gap * rand_0_1) + low;
+                } else {
+                    *p = (rand() % rand_gap) + low;
+                }
+            }
+        }
+
+        return ret;
+    }
+
     size_t num_elems() const
     {
         return this->height * this->stride;
