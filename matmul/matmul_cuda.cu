@@ -6,6 +6,7 @@
 #include <atomic>
 #include <chrono>
 #include <vector>
+#include <limits>
 #include <mutex>
 
 #include <cuda_runtime.h>
@@ -1246,7 +1247,7 @@ EXTERN_C void run_kernel_cu_grad_f32(
 }
 
 /* Classify learning rate. */
-inline constexpr f32 LEARNING_RATE = 1e-9;
+static f32 LEARNING_RATE = 1e-10;
 
 __global__ void kernel_hidden_forward(
     struct matrix lhs,
@@ -1403,7 +1404,7 @@ static void hidden_backward(
     kernel_hidden_backward_data<<<grid_dims_d, block_dims>>>(lhs, rhs, parent);
 }
 
-__global__ void kernel_apply_gradient(struct matrix m)
+__global__ void kernel_apply_gradient(struct matrix m, f32 lr)
 {
     const u32 gx = threadIdx.x + blockIdx.x * blockDim.x;
     const u32 gy = threadIdx.y + blockIdx.y * blockDim.y;
@@ -1412,7 +1413,7 @@ __global__ void kernel_apply_gradient(struct matrix m)
     if (out_of_bounds)
         return;
 
-    m.data[gx + gy * m.stride] -= m.grad[gx + gy * m.stride] * LEARNING_RATE;
+    m.data[gx + gy * m.stride] -= m.grad[gx + gy * m.stride] * lr;
 }
 
 static void apply_gradient(struct matrix m)
@@ -1426,7 +1427,7 @@ static void apply_gradient(struct matrix m)
     const u32 num_blocks_y = (m.height + num_threads-1u) / num_threads;
     const dim3 grid_dims(num_blocks_x, num_blocks_y);
 
-    kernel_apply_gradient<<<grid_dims, block_dims>>>(m);
+    kernel_apply_gradient<<<grid_dims, block_dims>>>(m, LEARNING_RATE);
 }
 
 /* Print human-readable duration. */
@@ -1526,6 +1527,7 @@ EXTERN_C void train_cu_classify(
     using std::chrono::duration_cast;
     auto status_start       = ticker_t::now();
     auto status_last_update = status_start;
+    f32 loss_prev = std::numeric_limits<f32>::infinity();
 
     auto maybe_print_status_line = [&] (const auto epoch, const auto max_epochs, bool force = false) {
         f32 loss;
@@ -1541,9 +1543,14 @@ EXTERN_C void train_cu_classify(
 
         printf(
             "\033[2K\r" /* Clear line, carriage return. */
-            "epochs: %u/%u, loss: %f, duration: ",
-            epoch, max_epochs, loss
+            "epochs: %u/%u, loss: %f, lr: %.01e, duration: ",
+            epoch, max_epochs, loss, LEARNING_RATE
         );
+
+        if (loss > loss_prev)
+            LEARNING_RATE /= 10.0f;
+
+        loss_prev = loss;
 
         print_human_duration(duration_cast<seconds>(now - status_start));
         fflush(stdout);
