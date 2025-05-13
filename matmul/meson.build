@@ -54,6 +54,7 @@ libmatmul_src = [
     'threading.cc',
     'matmul_cuda.cu',
     'matmul_cuda.cc',
+    'interrupt.cc',
 ]
 
 libmatmul = static_library(

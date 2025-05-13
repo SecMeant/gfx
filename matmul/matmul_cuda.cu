@@ -14,6 +14,7 @@
 #include "ansi_codes.h"
 #include "types.h"
 #include "matmul_cuda.h"
+#include "interrupt.h"
 
 #include "print_utils.h"
 
@@ -1555,7 +1556,8 @@ EXTERN_C void train_cu_classify(
     };
 
     /* Train. */
-    for (u32 i = 0; i < num_epochs; ++i) {
+    u32 epoch;
+    for (epoch = 0; epoch < num_epochs && (!should_exit()); ++epoch) {
         hidden_forward(d_hidden[0],       d_xs, d_ypred[0]);
         hidden_forward(d_hidden[1], d_ypred[0], d_ypred[1]);
         hidden_forward(d_hidden[2], d_ypred[1], d_ypred[2]);
@@ -1567,9 +1569,9 @@ EXTERN_C void train_cu_classify(
         apply_gradient(d_hidden[1]);
         apply_gradient(d_hidden[0]);
 
-        maybe_print_status_line(i, num_epochs);
+        maybe_print_status_line(epoch, num_epochs);
     }
-    maybe_print_status_line(num_epochs, num_epochs, true);
+    maybe_print_status_line(epoch, num_epochs, true);
     putchar('\n');
 
     /* Copy hidden layers to host memory. */

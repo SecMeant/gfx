@@ -17,6 +17,7 @@
 #include "timing.h"
 #include "bench.h"
 #include "options.h"
+#include "interrupt.h"
 
 constexpr bool VERBOSE = true;
 
@@ -956,6 +957,8 @@ int main(int argc, char **argv)
     bool explicit_enable = false;
     bool explicit_enable_f32 = false;
     bool explicit_enable_i64 = false;
+
+    register_interrupt_handler();
 
     for (int arg = 1; arg < argc; ++arg) {
         const char *s = argv[arg];
