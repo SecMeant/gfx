@@ -1457,7 +1457,7 @@ EXTERN_C void train_cu_classify(
 ) {
     constexpr u32 num_epochs = 1024u * 128u;
     constexpr u32 num_layers = 3u;
-    constexpr u32 params[]   = {10u, 8u}; /* Number of parameters for each layer. */
+    const u32 params[] = {h_xs.width, 10u, 8u, 1u}; /* Number of parameters for each layer. */
 
     struct matrix d_xs, d_ygt, d_hidden[num_layers], d_ypred[num_layers];
     mat_f32_t h_ypred[num_layers];
@@ -1480,14 +1480,12 @@ EXTERN_C void train_cu_classify(
      * [ 1;  8] x [ 8; 4096] => [ 1; 4096]
      *
      */
-    checkCudaError(d_hidden[0].alloc_on_device(params[0], d_xs.width, STRIDE_AUTO, with_grad));
-    checkCudaError(d_hidden[1].alloc_on_device(params[1],  params[0], STRIDE_AUTO, with_grad));
-    checkCudaError(d_hidden[2].alloc_on_device(        1,  params[1], STRIDE_AUTO, with_grad));
+    for (u32 i = 0; i < num_layers; ++i)
+        checkCudaError(d_hidden[i].alloc_on_device(params[i+1], params[i], STRIDE_AUTO, with_grad));
 
     /* Buffers for holding results after forward pass through hidden layers. */
-    checkCudaError(d_ypred[0].alloc_on_device(params[0], d_xs.height, STRIDE_AUTO, with_grad));
-    checkCudaError(d_ypred[1].alloc_on_device(params[1], d_xs.height, STRIDE_AUTO, with_grad));
-    checkCudaError(d_ypred[2].alloc_on_device(        1, d_xs.height, STRIDE_AUTO, with_grad));
+    for (u32 i = 0; i < num_layers; ++i)
+        checkCudaError(d_ypred[i].alloc_on_device(params[i+1], d_xs.height, STRIDE_AUTO, with_grad));
 
     for (u32 i = 0; i < std::size(d_ypred); ++i) {
         h_ypred[i]       = mat_f32_t::make_matrix(d_ypred[i].width, d_ypred[i].height, d_ypred[i].stride);
