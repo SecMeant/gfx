@@ -3,3 +3,4 @@ build/
 .cache/
 .gdb_history
 tests/files/*.safetensors
+.vimsession
