@@ -1139,6 +1139,13 @@ __global__ void kernel_grad_cu_backward(
     w.data[gx + gy * w.stride] -= w.grad[gx + gy * w.stride] * lr;
 }
 
+template<typename FloatType>
+FloatType infinity_of(FloatType x)
+{
+    (void) x;
+    return std::numeric_limits<std::remove_reference_t<FloatType>>::infinity();
+}
+
 EXTERN_C void run_kernel_cu_grad_f32(
     matview_f32_t h_xs,
     matview_f32_t h_ygt,
@@ -1183,8 +1190,9 @@ EXTERN_C void run_kernel_cu_grad_f32(
     const dim3 grid_dims(num_blocks, num_blocks);
 
     constexpr f32 LOSS_TARGET = 1e-5f;
+    out_loss = infinity_of(out_loss);
     u32 epoch = 0;
-    while(1) {
+    while(!should_exit() && out_loss > LOSS_TARGET) {
 
         /*
          * Forward pass
@@ -1234,9 +1242,6 @@ EXTERN_C void run_kernel_cu_grad_f32(
 
             printf("loss: %f\n", out_loss);
         }
-
-        if (out_loss <= LOSS_TARGET)
-            break;
     }
 
     cudaFree(d_lossv);
