@@ -958,8 +958,6 @@ int main(int argc, char **argv)
     bool explicit_enable_f32 = false;
     bool explicit_enable_i64 = false;
 
-    register_interrupt_handler();
-
     for (int arg = 1; arg < argc; ++arg) {
         const char *s = argv[arg];
 
@@ -1021,6 +1019,9 @@ int main(int argc, char **argv)
             continue;
         }
     }
+
+    if (opt_grad || opt_classify)
+        register_interrupt_handler();
 
     if (opt_grad)
         return run_gradient_descent();
