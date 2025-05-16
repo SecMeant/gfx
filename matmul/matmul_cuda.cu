@@ -1531,7 +1531,7 @@ EXTERN_C void train_cu_classify(
     using std::chrono::duration_cast;
     auto status_start       = ticker_t::now();
     auto status_last_update = status_start;
-    f32 loss_prev = std::numeric_limits<f32>::infinity();
+    auto loss_prev = std::numeric_limits<f32>::infinity();
 
     auto maybe_print_status_line = [&] (const auto epoch, const auto max_epochs, bool force = false) {
         f32 loss;
