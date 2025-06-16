@@ -1,3 +1,5 @@
 *.o
 sortbench
+.cache/
+compile_commands.json
 
