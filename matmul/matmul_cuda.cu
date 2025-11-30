@@ -95,6 +95,12 @@ EXTERN_C int matmul_cu_init(bool verbose)
         printf("  gpu clock         : %d MHz\n", devprop.clockRate / 1024);
         printf("  mem clock         : %d MHz\n", devprop.memoryClockRate / 1024);
         printf("  bus width         : %d\n", devprop.memoryBusWidth);
+
+        /* Memory clock rate already in kilo bytes. */
+        const float peak_bandwidth_kbytes =
+            scast<float>(devprop.memoryClockRate)*scast<float>(devprop.memoryBusWidth) / 8.f;
+        printf("  peak bandwidth    : %.2f GB/s\n", peak_bandwidth_kbytes / 1024.f / 1024.f);
+
         putchar('\n');
     }
 
