@@ -36,7 +36,17 @@
  */
 static std::mutex kernel_exec_mtx;
 
-static std::vector<cudaDeviceProp> cuda_devices;
+/*
+ * Some of the fields can no longer be fetched via cudaGetDeviceProperties().
+ * Extend cudaDeviceProp with thosse fields and fetch them using cudaDeviceGetAttribute().
+ */
+struct cuda_device_info : public cudaDeviceProp
+{
+    int clockRate;
+    int memoryClockRate;
+};
+
+static std::vector<cuda_device_info> cuda_devices;
 static const cudaDeviceProp& current_dev()
 {
     assert(!cuda_devices.empty());
@@ -61,6 +71,8 @@ EXTERN_C int matmul_cu_init(bool verbose)
     for (int dev_id = 0; dev_id < num_devices; ++dev_id) {
         auto &devprop = cuda_devices.emplace_back();
         checkCudaError(cudaGetDeviceProperties(&devprop, dev_id));
+        checkCudaError(cudaDeviceGetAttribute(&devprop.clockRate, cudaDevAttrClockRate, dev_id));
+        checkCudaError(cudaDeviceGetAttribute(&devprop.memoryClockRate, cudaDevAttrMemoryClockRate, dev_id));
 
         if (!verbose)
             continue;
