@@ -13,6 +13,7 @@ enum class cuda_kernel_variant {
     UMEM,
     UMEM_TILED,
     TILED,
+    TILED_INPUT, /* Only input matrices are cached. */
     TEST,
 };
 

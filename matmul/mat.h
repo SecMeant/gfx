@@ -381,6 +381,7 @@ mat_i64_t mat_mul_cl(matview_i64_t lhs, matview_i64_t rhs);
 mat_i64_t mat_mul_cu(matview_i64_t lhs, matview_i64_t rhs);
 mat_i64_t mat_mul_cu_umem_tiled(matview_i64_t lhs, matview_i64_t rhs);
 mat_i64_t mat_mul_cu_tiled(matview_i64_t lhs, matview_i64_t rhs);
+mat_i64_t mat_mul_cu_tiled_input(matview_i64_t lhs, matview_i64_t rhs);
 mat_i64_t mat_mul_cu_test(matview_i64_t lhs, matview_i64_t rhs);
 
 
@@ -400,4 +401,5 @@ mat_f32_t mat_mul_cl(matview_f32_t lhs, matview_f32_t rhs);
 mat_f32_t mat_mul_cu(matview_f32_t lhs, matview_f32_t rhs);
 mat_f32_t mat_mul_cu_umem_tiled(matview_f32_t lhs, matview_f32_t rhs);
 mat_f32_t mat_mul_cu_tiled(matview_f32_t lhs, matview_f32_t rhs);
+mat_f32_t mat_mul_cu_tiled_input(matview_f32_t lhs, matview_f32_t rhs);
 mat_f32_t mat_mul_cu_test(matview_f32_t lhs, matview_f32_t rhs);

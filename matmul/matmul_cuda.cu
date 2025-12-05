@@ -200,6 +200,65 @@ __global__ void kernel_matmul_tiled_cu(
 /*
  * We assume all matrcies are square and have the same dimensions.
  */
+__global__ void kernel_matmul_tiled_input_cu(
+    const i64 *lhs,
+    const i64 *rhs,
+          i64 *out,
+    const u32  dim,
+    const u32  lhs_stride,
+    const u32  rhs_stride,
+    const u32  out_stride
+) {
+    constexpr u32 TILE_SIZE = 32 * 32;
+
+    __shared__ i64 tilea[TILE_SIZE];
+    __shared__ i64 tileb[TILE_SIZE];
+
+    /* Global coordinates for this thread. */
+    const u32 gx = threadIdx.x + blockIdx.x * blockDim.x;
+    const u32 gy = threadIdx.y + blockIdx.y * blockDim.y;
+
+    const bool out_of_bounds = gx >= dim | gy >= dim;
+    if (out_of_bounds)
+        return;
+
+    /* Local tile coordinates for this thread. */
+    const u32 tx      = threadIdx.x;
+    const u32 ty      = threadIdx.y;
+    const u32 tstride = blockDim.x;
+
+    i64 local_result = 0;
+
+    /*
+     * Row is a loop invariant for tilea.
+     * Column is a loop invariant for tileb.
+     */
+    for (int j = 0; j < dim; j += blockDim.x) {
+
+        /*
+         * Load lhs and rhs tiles into shared memory.
+         * Each thread loads one element.
+         */
+        tilea[tx + ty * tstride] = lhs[(tx+j) + gy * lhs_stride];
+        tileb[tx + ty * tstride] = rhs[gx + (ty+j) * rhs_stride];
+
+        /* Make sure tilea and tileb are populated. */
+        __syncthreads();
+
+        /* Accumulate results for current tile. */
+        for (u32 i = 0; i < blockDim.x; ++i)
+            local_result += tilea[i + ty * tstride] * tileb[tx + i * tstride];
+
+        /* Make sure we don't modify tilea and tileb before all threads are finihsed with per tile computation */
+        __syncthreads();
+    }
+
+    out[gx + gy * out_stride] = local_result;
+}
+
+/*
+ * We assume all matrcies are square and have the same dimensions.
+ */
 __global__ void kernel_matmul_test_cu(
     const i64 *lhs,
     const i64 *rhs,
@@ -340,7 +399,8 @@ static int run_kernel_cu_tiled_(
     const u32  dim,
     const u32  lhs_stride,
     const u32  rhs_stride,
-    const u32  out_stride
+    const u32  out_stride,
+    const bool cache_writes
 ) {
           i64 *d_lhs;
     const u32  lhs_size = dim * lhs_stride * sizeof(*d_lhs);
@@ -365,15 +425,27 @@ static int run_kernel_cu_tiled_(
     const u32 num_blocks = (dim + num_threads - 1) / num_threads;
     const dim3 grid_dims(num_blocks, num_blocks);
 
-    kernel_matmul_tiled_cu<<<grid_dims, block_dims>>>(
-        d_lhs,
-        d_rhs,
-        d_out,
-        dim,
-        lhs_stride,
-        rhs_stride,
-        out_stride
-    );
+    if (cache_writes) {
+        kernel_matmul_tiled_cu<<<grid_dims, block_dims>>>(
+            d_lhs,
+            d_rhs,
+            d_out,
+            dim,
+            lhs_stride,
+            rhs_stride,
+            out_stride
+        );
+    } else {
+        kernel_matmul_tiled_input_cu<<<grid_dims, block_dims>>>(
+            d_lhs,
+            d_rhs,
+            d_out,
+            dim,
+            lhs_stride,
+            rhs_stride,
+            out_stride
+        );
+    }
     cudaDeviceSynchronize();
 
     checkCudaError(cudaMemcpy(h_out, d_out, out_size, cudaMemcpyDeviceToHost));
@@ -498,6 +570,8 @@ EXTERN_C int run_kernel_cu(
         );
 
     case cuda_kernel_variant::TILED:
+    case cuda_kernel_variant::TILED_INPUT: {
+        const bool cache_writes = variant == cuda_kernel_variant::TILED;
         return run_kernel_cu_tiled_(
             h_lhs,
             h_rhs,
@@ -505,8 +579,10 @@ EXTERN_C int run_kernel_cu(
             lhs_cols,
             lhs_stride,
             rhs_stride,
-            out_stride
+            out_stride,
+            cache_writes
         );
+    }
 
     case cuda_kernel_variant::TEST:
         return run_kernel_cu_test_(
@@ -611,6 +687,77 @@ __global__ void kernel_matmul_tiled_cu_f32(
     }
 
     out[gx + gy * out_stride] = tilec[tx + ty * tstride];
+}
+
+/*
+ * We assume all matrcies are square and have the same dimensions.
+ */
+__global__ void kernel_matmul_tiled_input_cu_f32(
+    const f32 *lhs,
+    const f32 *rhs,
+          f32 *out,
+    const u32  dim,
+    const u32  lhs_stride,
+    const u32  rhs_stride,
+    const u32  out_stride
+) {
+    constexpr u32 TILE_STRIDE = 64;
+    constexpr u32 TILE_SIZE   = TILE_STRIDE * TILE_STRIDE;
+
+    __shared__ f32 tilea[TILE_SIZE];
+    __shared__ f32 tileb[TILE_SIZE];
+
+    /* Global coordinates for this thread. */
+    const u32 gx = threadIdx.x + blockIdx.x * blockDim.x;
+    const u32 gy = threadIdx.y + blockIdx.y * blockDim.y;
+
+    const bool out_of_bounds = gx >= dim | gy >= dim;
+    if (out_of_bounds)
+        return;
+
+    /* Local tile coordinates for this thread. */
+    const u32 tx      = threadIdx.x;
+    const u32 ty      = threadIdx.y;
+    const u32 tstride = TILE_STRIDE;
+
+    f32 local_result = 0;
+
+    /*
+     * Row is a loop invariant for tilea.
+     * Column is a loop invariant for tileb.
+     */
+    for (int j = 0; j < dim; j += TILE_STRIDE) {
+
+        /*
+         * Load lhs and rhs tiles into shared memory.
+         * Each thread loads one element.
+         */
+        for (u32 vty = ty; vty < TILE_STRIDE; vty += blockDim.y) {
+            for (u32 vtx = tx; vtx < TILE_STRIDE; vtx += blockDim.x) {
+                if (vtx+j < dim)
+                    tilea[vtx + vty * tstride] = lhs[(vtx+j) + gy * lhs_stride];
+                else
+                    tilea[vtx + vty * tstride] = 0;
+
+                if (vty+j < dim)
+                    tileb[vtx + vty * tstride] = rhs[gx + (vty+j) * rhs_stride];
+                else
+                    tileb[vtx + vty * tstride] = 0;
+            }
+        }
+
+        /* Make sure tilea and tileb are populated. */
+        __syncthreads();
+
+        /* Accumulate results for current tile. */
+        for (u32 i = 0; i < TILE_STRIDE; ++i)
+            local_result += tilea[i + ty * tstride] * tileb[tx + i * tstride];
+
+        /* Make sure we don't modify tilea and tileb before all threads are finihsed with per tile computation */
+        __syncthreads();
+    }
+
+    out[gx + gy * out_stride] = local_result;
 }
 
 /*
@@ -756,7 +903,8 @@ static int run_kernel_cu_tiled_f32_(
     const u32  dim,
     const u32  lhs_stride,
     const u32  rhs_stride,
-    const u32  out_stride
+    const u32  out_stride,
+    const bool cache_writes
 ) {
           f32 *d_lhs;
     const u32  lhs_size = dim * lhs_stride * sizeof(*d_lhs);
@@ -781,15 +929,27 @@ static int run_kernel_cu_tiled_f32_(
     const u32 num_blocks = (dim + num_threads - 1) / num_threads;
     const dim3 grid_dims(num_blocks, num_blocks);
 
-    kernel_matmul_tiled_cu_f32<<<grid_dims, block_dims>>>(
-        d_lhs,
-        d_rhs,
-        d_out,
-        dim,
-        lhs_stride,
-        rhs_stride,
-        out_stride
-    );
+    if (cache_writes) {
+        kernel_matmul_tiled_cu_f32<<<grid_dims, block_dims>>>(
+            d_lhs,
+            d_rhs,
+            d_out,
+            dim,
+            lhs_stride,
+            rhs_stride,
+            out_stride
+        );
+    } else {
+        kernel_matmul_tiled_input_cu_f32<<<grid_dims, block_dims>>>(
+            d_lhs,
+            d_rhs,
+            d_out,
+            dim,
+            lhs_stride,
+            rhs_stride,
+            out_stride
+        );
+    }
     cudaDeviceSynchronize();
 
     checkCudaError(cudaMemcpy(h_out, d_out, out_size, cudaMemcpyDeviceToHost));
@@ -914,6 +1074,8 @@ EXTERN_C int run_kernel_cu_f32(
         );
 
     case cuda_kernel_variant::TILED:
+    case cuda_kernel_variant::TILED_INPUT: {
+        const bool cache_writes = variant == cuda_kernel_variant::TILED;
         return run_kernel_cu_tiled_f32_(
             h_lhs,
             h_rhs,
@@ -921,8 +1083,10 @@ EXTERN_C int run_kernel_cu_f32(
             lhs_cols,
             lhs_stride,
             rhs_stride,
-            out_stride
+            out_stride,
+            cache_writes
         );
+    }
 
     case cuda_kernel_variant::TEST:
         return run_kernel_cu_test_f32_(
